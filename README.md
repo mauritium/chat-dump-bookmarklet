@@ -45,7 +45,9 @@ Then open a conversation on a supported platform and click the bookmark. The toa
 
 The bookmarklet only runs on `https://` pages of exactly `chatgpt.com`, `www.chatgpt.com`, `chat.openai.com`, `claude.ai`, `www.claude.ai` and `gemini.google.com`.
 
-> **Heads up!** As with any bookmarklet, review the source before installing it. `npm run build` reproduces `dist/` byte-for-byte from `src/`.
+> **Heads up!** As with any bookmarklet, review the source before installing it. `npm run verify` rebuilds from `src/` and fails unless `dist/` matches byte for byte.
+
+> **Embedding the bookmarklet in HTML.** Spaces, `%`, `#`, `<`, `>` and control characters are percent-encoded; quotes, backslashes, braces and brackets stay raw (escaping them as `encodeURI` does would add ~14KB). Spaces must be encoded because Safari silently drops raw spaces from a pasted `javascript:` URL, which breaks the code with `SyntaxError: Unexpected token '{'`. Pasting into the bookmark URL field works as is; to embed the file in an `href`, escape `"` as `&quot;` first.
 
 ## Building from source
 
@@ -53,10 +55,12 @@ The bookmarklet only runs on `https://` pages of exactly `chatgpt.com`, `www.cha
 git clone https://github.com/mauriziofonte/chat-dump-bookmarklet.git
 cd chat-dump-bookmarklet
 npm install
-npm run build
+npm run build   # writes dist/chatdump.bookmarklet.js and prints its SHA-256
+npm run verify  # rebuilds in memory and fails if dist/ differs
+npm test
 ```
 
-The build bundles and minifies with `esbuild` (evergreen-browser targets: the chat platforms themselves require nothing less), prefixes `javascript:void`, URI-encodes, and writes `dist/chatdump.bookmarklet.js`. It **fails hard** if the encoded output exceeds the 62KB bookmarklet URL limit; current size is ~60KB, most of it the i18n tables once percent-encoded.
+The build bundles and minifies with `esbuild` (evergreen-browser targets: the chat platforms themselves require nothing less), prefixes `javascript:void`, encodes (see `encode.js`), and writes `dist/chatdump.bookmarklet.js`. It **fails hard** if the encoded output exceeds the 62KB bookmarklet URL limit; current size is ~51KB, most of it the i18n tables. To save space, the build stores spaces in the message tables as `~` and `t()` restores them (a space costs 3 bytes once encoded, `~` one).
 
 ## Development and testing
 
@@ -84,7 +88,7 @@ node test/meta-build.mjs    # per-module bundle size breakdown
 For in-browser debugging, decode the bundle and paste it into the DevTools console of a conversation page:
 
 ```bash
-node -e "console.log(decodeURI(require('fs').readFileSync('dist/chatdump.bookmarklet.js','utf8')).replace(/^javascript:void /,''))"
+node -e "console.log(decodeURIComponent(require('fs').readFileSync('dist/chatdump.bookmarklet.js','utf8').slice('javascript:'.length)).replace(/^void /,''))"
 ```
 
 Runtime failures are logged with the `[ChatDump Error]` prefix and surfaced in an error toast; remote-extraction fallbacks log a `[ChatDump]` warning.
@@ -106,6 +110,7 @@ src/MarkdownRenderer.js      compact MD->HTML renderer for API-sourced turns
 src/HTMLCleaner.js           tag/attribute sanitizer for DOM-sourced HTML export
 src/I18n.js                  locale tables (10 languages + Italian) and t()
 src/UIManager.js             toast UI (loading / export / copied / error states)
+bundle.js, build.js, encode.js  reproducible build, --check mode, bookmarklet encoding
 src/Utilities.js             filename slug/timestamp
 types.js                     JSDoc typedefs (ConversationItem, ParserModule)
 ```

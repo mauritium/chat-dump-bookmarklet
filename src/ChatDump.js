@@ -41,10 +41,10 @@ export async function run() {
 					rawConversations = remote.items
 					title = remote.title || title
 				} else if (remote === null) {
-					console.warn('[ChatDump] Remote extraction unavailable, falling back to DOM parsing')
+					console.warn('[ChatDump] API unavailable, using DOM')
 				}
 			} catch (error) {
-				console.warn('[ChatDump] Remote extraction failed, falling back to DOM parsing', error)
+				console.warn('[ChatDump] API failed, using DOM', error)
 			} finally {
 				clearTimeout(timer)
 			}
