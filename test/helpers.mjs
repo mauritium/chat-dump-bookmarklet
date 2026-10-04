@@ -3,6 +3,7 @@
  * window/document/navigator) and builds a mock same-origin fetch.
  */
 import { JSDOM } from 'jsdom'
+import { mock } from 'node:test'
 
 /**
  * Installs jsdom globals for the given page URL and returns the JSDOM.
@@ -83,3 +84,26 @@ export function pagedRoutes(pages) {
 	})
 	return routes
 }
+
+/**
+ * Runs the whole bookmarklet pipeline (run()) in a fresh jsdom page and returns
+ * the three exports and the toast text.
+ * @param {function(JSDOM): void} setup - Installs fetch routes / DOM content.
+ * @param {string} [url] - The page URL.
+ */
+export async function exportAll(setup, url = `https://chatgpt.com/c/${CONV_ID}`) {
+	const dom = installDom(url)
+	global.requestAnimationFrame = (cb) => cb()
+	Object.defineProperty(dom.window.HTMLElement.prototype, 'innerText', { get() { return this.textContent }, configurable: true })
+	const blobs = []
+	global.URL.createObjectURL = (b) => (blobs.push(b), `blob:${blobs.length}`)
+	global.URL.revokeObjectURL = () => {}
+	mock.method(console, 'warn', () => {})
+	mock.method(console, 'error', () => {})
+	setup(dom)
+	const { run } = await import('../src/ChatDump.js?' + Math.random())
+	await run()
+	const [md, html, txt] = await Promise.all(blobs.slice(-3).map((b) => b.text()))
+	return { md, html, txt, toast: document.querySelector('.chatdump-toast').textContent }
+}
+

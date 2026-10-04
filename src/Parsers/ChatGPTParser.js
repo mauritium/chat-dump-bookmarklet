@@ -4,6 +4,7 @@ import { t } from '../I18n.js'
 import { apiGet, marker, fence } from '../RemoteUtils.js'
 import { fetchConversation } from '../ChatGPTApi.js'
 import { convertCitations } from '../Citations.js'
+import { toIso, latestIso, modelId, unique } from '../Metadata.js'
 
 const CONVERSATION_PATH = /\/c\/([0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12})/i
 
@@ -89,10 +90,20 @@ const ChatGPTParser = {
 		// Assistant turns span several mapping nodes (text + tool code chains):
 		// merge consecutive assistant messages into one RESPONSE, as in the UI
 		let responseParts = []
+		let responseMessages = []
 		const flushResponse = () => {
 			if (responseParts.length) {
-				items.push(createConversationItem({ role: 'RESPONSE', num: ++responseNum, markdown: responseParts.join('\n\n') }))
+				// ChatGPT records no completion time: only creation (first record)
+				// and the last modification of the records are known
+				const meta = {
+					created: toIso(responseMessages[0].create_time),
+					completed: null,
+					updated: latestIso(responseMessages.map((m) => toIso(m.update_time))),
+					models: unique(responseMessages.map((m) => modelId(m.metadata && m.metadata.model_slug))),
+				}
+				items.push(createConversationItem({ role: 'RESPONSE', num: ++responseNum, markdown: responseParts.join('\n\n'), meta }))
 				responseParts = []
+				responseMessages = []
 			}
 		}
 
@@ -106,12 +117,14 @@ const ChatGPTParser = {
 				const markdown = _messageMarkdown(message)
 				const attachments = _messageAttachments(message)
 				if (markdown || attachments.length) {
-					items.push(createConversationItem({ role: 'PROMPT', num: ++promptNum, markdown, attachments }))
+					const meta = { created: toIso(message.create_time), completed: null, updated: null, models: [] }
+					items.push(createConversationItem({ role: 'PROMPT', num: ++promptNum, markdown, attachments, meta }))
 				}
 			} else if (role === 'assistant') {
 				const markdown = convertCitations(_messageMarkdown(message), message.metadata)
 				if (markdown) {
 					responseParts.push(markdown)
+					responseMessages.push(message)
 				}
 			}
 			// system / tool messages: skipped
@@ -121,7 +134,17 @@ const ChatGPTParser = {
 		if (!items.length) {
 			return null
 		}
-		return { title: data.title || document.title, items, source: 'api', complete: data.complete, warnings: data.warnings, stats: data.stats, endpoint: data.endpoint }
+		return {
+			title: data.title || document.title,
+			items,
+			source: 'api',
+			complete: data.complete,
+			warnings: data.warnings,
+			stats: data.stats,
+			endpoint: data.endpoint,
+			models: unique(items.reduce((all, i) => all.concat(i.meta.models), [])),
+			defaultModel: modelId(data.defaultModel) || undefined,
+		}
 	},
 
 	parse: (body) => {

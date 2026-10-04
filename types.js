@@ -19,6 +19,9 @@
  * @property {boolean} [richText] - For DOM-based PROMPT items: convert the content
  *           through Turndown (preserves code fences, lists) instead of innerText.
  * @property {string[]} [attachments] - File names attached to the turn (prompt uploads).
+ * @property {{created: string|null, completed: string|null, updated: string|null, models: string[]}} [meta] -
+ *           Original metadata: ISO 8601 UTC timestamps (null = unknown) and the recorded model
+ *           identifiers of a response. Absent for DOM-extracted items.
  */
 
 /**
@@ -31,6 +34,8 @@
  *           the start of the conversation without anomalies.
  * @property {string[]} [warnings] - Human-readable completeness/branch problems.
  * @property {object} [stats] - Retrieval counters (pages, messages, duplicates).
+ * @property {string[]} [models] - Distinct model identifiers recorded on the exported responses.
+ * @property {string} [defaultModel] - Conversation-level model identifier, when the payload has one.
  */
 
 /**
@@ -40,6 +45,8 @@
  * @property {boolean} complete - Verified complete (API retrieval without warnings).
  * @property {string[]} warnings - Problems to show to the reader.
  * @property {object} [stats] - Retrieval counters.
+ * @property {string[]} [models] - Recorded response model identifiers.
+ * @property {string} [defaultModel] - Conversation-level model identifier.
  */
 
 /**

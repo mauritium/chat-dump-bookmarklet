@@ -3,6 +3,7 @@ import { cleanHtml } from './HTMLCleaner.js'
 import { renderMarkdown } from './MarkdownRenderer.js'
 import { t } from './I18n.js'
 import { escapeHtml, htmlLink, safeHttpUrl, oneLine } from './Html.js'
+import { turnMetaBlock, headerBlock } from './Metadata.js'
 import TurndownService from 'turndown'
 import { tables } from 'turndown-plugin-gfm'
 
@@ -49,6 +50,15 @@ function _preamble(format) {
 function _htmlPreamble(parts) {
 	const tokens = { format: 'HTML', tool: '\u0001tool', date: '\u0001date', url: '\u0001url' }
 	return escapeHtml(t('preamble', tokens)).replace(/\u0001(tool|date|url)/g, (m, key) => parts[key])
+}
+
+/**
+ * The export time (ISO 8601 UTC): taken once per export so all formats agree.
+ * @param {ExportInfo} [info] - Retrieval info; info.exportedAt wins when set.
+ * @returns {string} The ISO timestamp.
+ */
+function _exportedAt(info) {
+	return (info && info.exportedAt) || new Date().toISOString()
 }
 
 /**
@@ -156,10 +166,10 @@ export function formatAsMarkdown(conversations, title, info) {
 
 	const body = conversations.reduce((acc, c) => {
 		const header = _getConversationHeader(c.role, c.num)
-		return `${acc}## ${header}\n\n${_attachmentsMd(c)}${_itemContent(ts, c)}\n\n`
+		return `${acc}## ${header}\n\n${turnMetaBlock(c, 'md')}${_attachmentsMd(c)}${_itemContent(ts, c)}\n\n`
 	}, '')
 
-	return `# ${oneLine(title)}\n\n${_preamble('md')}\n\n${_noticeBlock(info, 'md')}${body}`
+	return `# ${oneLine(title)}\n\n${_preamble('md')}\n\n${headerBlock(info, _exportedAt(info), 'md')}${_noticeBlock(info, 'md')}${body}`
 }
 
 /**
@@ -174,10 +184,10 @@ export function formatAsHtml(conversations, title, info) {
 		const header = _getConversationHeader(c.role, c.num)
 		const attachments = c.attachments && c.attachments.length ? `\n<p><em>${escapeHtml(t('attachments'))}: ${c.attachments.map(escapeHtml).join(', ')}</em></p>` : ''
 		const content = typeof c.markdown === 'string' ? renderMarkdown(c.markdown) : cleanHtml(c.content)
-		return `${acc}\n<h2>${escapeHtml(header)}</h2>${attachments}\n${content}`
+		return `${acc}\n<h2>${escapeHtml(header)}</h2>${turnMetaBlock(c, 'html')}${attachments}\n${content}`
 	}, '')
 
-	return `<h1>${escapeHtml(title)}</h1>\n<p><em>${_preamble('html')}</em></p>${_noticeBlock(info, 'html')}${body}`
+	return `<h1>${escapeHtml(title)}</h1>\n<p><em>${_preamble('html')}</em></p>${headerBlock(info, _exportedAt(info), 'html')}${_noticeBlock(info, 'html')}${body}`
 }
 
 /**
@@ -197,8 +207,8 @@ export function formatAsTxt(conversations, title, info) {
 	const body = conversations.reduce((acc, c) => {
 		const header = _getConversationHeader(c.role, c.num)
 		const attachments = c.attachments && c.attachments.length ? `[${t('attachments')}: ${c.attachments.map(oneLine).join(', ')}]\n\n` : ''
-		return `${acc}${rule}\n${header}\n${rule}\n\n${attachments}${_itemContent(ts, c)}\n\n`
+		return `${acc}${rule}\n${header}\n${rule}\n\n${turnMetaBlock(c, 'txt')}${attachments}${_itemContent(ts, c)}\n\n`
 	}, '')
 
-	return `${title}\n${'='.repeat(Math.min(64, title.length))}\n\n${_preamble('txt')}\n\n${_noticeBlock(info, 'txt')}${body}`
+	return `${title}\n${'='.repeat(Math.min(64, title.length))}\n\n${_preamble('txt')}\n\n${headerBlock(info, _exportedAt(info), 'txt')}${_noticeBlock(info, 'txt')}${body}`
 }
