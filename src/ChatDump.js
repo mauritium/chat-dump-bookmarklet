@@ -1,6 +1,6 @@
 import { getPlatformParser, getSupportedPlatforms } from './ParserFactory.js'
 import { processConversations } from './ConversationProcessor.js'
-import { formatAsMarkdown, formatAsHtml, formatAsTxt } from './OutputFormatter.js'
+import { formatAsMarkdown, formatAsHtml, formatAsTxt, buildNotice } from './OutputFormatter.js'
 import { initUI, showError, showExportOptions, showLoading } from './UIManager.js'
 import { generateFilename } from './Utilities.js'
 import { t } from './I18n.js'
@@ -28,6 +28,8 @@ export async function run() {
 		// unavailable, fall back to parsing a clone of the body.
 		let title = document.title
 		let rawConversations = null
+		/** @type {ExportInfo} */
+		let info = { source: 'dom', complete: false, warnings: [] }
 		if (parser.parseRemote) {
 			// Immediate feedback: the API roundtrip can take seconds on long
 			// conversations. The loading toast is replaced by the export
@@ -40,10 +42,13 @@ export async function run() {
 				if (remote && remote.items.length) {
 					rawConversations = remote.items
 					title = remote.title || title
-				} else if (remote === null) {
+					info = { source: 'api', complete: remote.complete === true, warnings: remote.warnings || [], stats: remote.stats }
+				} else {
+					info.reason = 'no usable data'
 					console.warn('[ChatDump] API unavailable, using DOM')
 				}
 			} catch (error) {
+				info.reason = error.message
 				console.warn('[ChatDump] API failed, using DOM', error)
 			} finally {
 				clearTimeout(timer)
@@ -61,13 +66,13 @@ export async function run() {
 		const processedConversations = processConversations(rawConversations)
 
 		// 5. Format conversations into final outputs
-		const mdText = formatAsMarkdown(processedConversations, title)
-		const htmlText = formatAsHtml(processedConversations, title)
-		const txtText = formatAsTxt(processedConversations, title)
+		const mdText = formatAsMarkdown(processedConversations, title, info)
+		const htmlText = formatAsHtml(processedConversations, title, info)
+		const txtText = formatAsTxt(processedConversations, title, info)
 
 		// 6. Generate filename and show export dialog
 		const filename = generateFilename(parser.name, title)
-		showExportOptions({ mdText, htmlText, txtText, filename })
+		showExportOptions({ mdText, htmlText, txtText, filename, warning: buildNotice(info) && !info.complete ? t('toast_incomplete') : '' })
 	} catch (error) {
 		console.error('[ChatDump Error]', error)
 		showError(error.message)

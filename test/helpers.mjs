@@ -37,3 +37,49 @@ export function mockFetch(routes) {
 	}
 	return calls
 }
+
+import { readFileSync } from 'node:fs'
+
+export const CONV_ID = 'c0ffee00-0000-4000-8000-00000000abcd'
+
+/** Loads the synthetic paginated ChatGPT payload (deep copy per call). */
+export function loadPagedFixture() {
+	return JSON.parse(readFileSync(new URL('./fixtures/chatgpt-paged-synthetic.json', import.meta.url), 'utf8'))
+}
+
+/**
+ * Splits a paged payload into pages (newest first) linked by start_cursor.
+ * @param {object} full - The full payload.
+ * @param {number[]} sizes - Messages per page, oldest page first.
+ * @returns {object[]} Pages newest first.
+ */
+export function splitPages(full, sizes) {
+	const pages = []
+	let at = 0
+	sizes.forEach((size, i) => {
+		const messages = full.messages.slice(at, at + size)
+		at += size
+		const last = i === sizes.length - 1
+		pages.unshift({
+			...(last ? full : { title: full.title }),
+			messages,
+			page_info: { start_cursor: `cursor-${i}`, end_cursor: `end-${i}`, has_previous_page: i > 0, has_next_page: !last },
+		})
+	})
+	return pages
+}
+
+/**
+ * Routes for the paged ChatGPT endpoint: first request has no `before`, later
+ * ones carry the cursor of the page they follow.
+ * @param {object[]} pages - Pages newest first.
+ * @returns {Object<string, any>} Route table for mockFetch.
+ */
+export function pagedRoutes(pages) {
+	const base = `/backend-api/conversations/${CONV_ID}?include_has_versions=true&num_turns=100`
+	const routes = { '/api/auth/session': { accessToken: 'tok-123' }, [base]: pages[0] }
+	pages.slice(0, -1).forEach((page, i) => {
+		routes[`${base}&before=${encodeURIComponent(page.page_info.start_cursor)}`] = pages[i + 1]
+	})
+	return routes
+}
