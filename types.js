@@ -26,6 +26,20 @@
  * @typedef {object} RemoteConversation
  * @property {string} title - The conversation title as known by the platform.
  * @property {ConversationItem[]} items - The extracted turns.
+ * @property {'api'|'dom'} [source] - Where the items came from (default 'api').
+ * @property {boolean} [complete] - True only when the retrieval verified that it reached
+ *           the start of the conversation without anomalies.
+ * @property {string[]} [warnings] - Human-readable completeness/branch problems.
+ * @property {object} [stats] - Retrieval counters (pages, messages, duplicates).
+ */
+
+/**
+ * Describes how an export was obtained; rendered as a notice in every format.
+ * @typedef {object} ExportInfo
+ * @property {'api'|'dom'} source - 'dom' means scraped from the visible page.
+ * @property {boolean} complete - Verified complete (API retrieval without warnings).
+ * @property {string[]} warnings - Problems to show to the reader.
+ * @property {object} [stats] - Retrieval counters.
  */
 
 /**

@@ -52,6 +52,47 @@ function _htmlPreamble(parts) {
 }
 
 /**
+ * Builds the completeness notice from the retrieval info. DOM extraction is
+ * always labelled possibly incomplete; API retrieval is called verified only
+ * when the retrieval itself reported complete.
+ * @param {ExportInfo} [info] - How the export was obtained.
+ * @returns {{label: string, text: string, items: string[]}|null} The notice, or null when there is nothing to say.
+ */
+export function buildNotice(info) {
+	if (!info) return null
+	const label = t('notice_label')
+	if (info.source === 'dom') {
+		const reason = info.reason ? t('notice_dom_reason', { reason: info.reason }) : ''
+		return { label, text: t('notice_dom', { reason }), items: [] }
+	}
+	const stats = { pages: (info.stats && info.stats.pages) || 1, messages: (info.stats && info.stats.messages) || 0 }
+	if (info.warnings && info.warnings.length) {
+		return { label, text: t('notice_api_warn', stats), items: info.warnings }
+	}
+	return info.complete ? { label, text: t('notice_api_ok', stats), items: [] } : null
+}
+
+/**
+ * Renders the notice for a format; empty string when there is no notice.
+ * @param {ExportInfo} [info] - How the export was obtained.
+ * @param {'md'|'html'|'txt'} format - The output format.
+ * @returns {string} The notice block including trailing blank line(s).
+ */
+function _noticeBlock(info, format) {
+	const notice = buildNotice(info)
+	if (!notice) return ''
+	if (format === 'html') {
+		const list = notice.items.length ? `<ul>${notice.items.map((i) => `<li>${escapeHtml(i)}</li>`).join('')}</ul>` : ''
+		return `\n<blockquote><p><strong>${escapeHtml(notice.label)}:</strong> ${escapeHtml(notice.text)}</p>${list}</blockquote>`
+	}
+	const lines = [oneLine(notice.text), ...notice.items.map((i) => `- ${oneLine(i)}`)]
+	if (format === 'md') {
+		return `> **${notice.label}:** ${lines.join('\n> ')}\n\n`
+	}
+	return `[${notice.label}] ${lines.join('\n')}\n\n`
+}
+
+/**
  * Creates the Turndown instance shared by the Markdown and TXT exports.
  * @returns {TurndownService}
  */
@@ -107,9 +148,10 @@ function _attachmentsMd(item) {
  * Converts conversations to a Markdown string.
  * @param {ConversationItem[]} conversations - The processed conversation items.
  * @param {string} title - The title of the chat.
+ * @param {ExportInfo} [info] - How the export was obtained (completeness notice).
  * @returns {string} The complete Markdown document.
  */
-export function formatAsMarkdown(conversations, title) {
+export function formatAsMarkdown(conversations, title, info) {
 	const ts = _turndown()
 
 	const body = conversations.reduce((acc, c) => {
@@ -117,16 +159,17 @@ export function formatAsMarkdown(conversations, title) {
 		return `${acc}## ${header}\n\n${_attachmentsMd(c)}${_itemContent(ts, c)}\n\n`
 	}, '')
 
-	return `# ${oneLine(title)}\n\n${_preamble('md')}\n\n${body}`
+	return `# ${oneLine(title)}\n\n${_preamble('md')}\n\n${_noticeBlock(info, 'md')}${body}`
 }
 
 /**
  * Converts conversations to an HTML string.
  * @param {ConversationItem[]} conversations - The processed conversation items.
  * @param {string} title - The title of the chat.
+ * @param {ExportInfo} [info] - How the export was obtained (completeness notice).
  * @returns {string} The complete HTML document string.
  */
-export function formatAsHtml(conversations, title) {
+export function formatAsHtml(conversations, title, info) {
 	const body = conversations.reduce((acc, c) => {
 		const header = _getConversationHeader(c.role, c.num)
 		const attachments = c.attachments && c.attachments.length ? `\n<p><em>${escapeHtml(t('attachments'))}: ${c.attachments.map(escapeHtml).join(', ')}</em></p>` : ''
@@ -134,7 +177,7 @@ export function formatAsHtml(conversations, title) {
 		return `${acc}\n<h2>${escapeHtml(header)}</h2>${attachments}\n${content}`
 	}, '')
 
-	return `<h1>${escapeHtml(title)}</h1>\n<p><em>${_preamble('html')}</em></p>${body}`
+	return `<h1>${escapeHtml(title)}</h1>\n<p><em>${_preamble('html')}</em></p>${_noticeBlock(info, 'html')}${body}`
 }
 
 /**
@@ -143,9 +186,10 @@ export function formatAsHtml(conversations, title) {
  * scaffolding uses plain separators instead of Markdown headers.
  * @param {ConversationItem[]} conversations - The processed conversation items.
  * @param {string} title - The title of the chat.
+ * @param {ExportInfo} [info] - How the export was obtained (completeness notice).
  * @returns {string} The complete plain-text document.
  */
-export function formatAsTxt(conversations, title) {
+export function formatAsTxt(conversations, title, info) {
 	const ts = _turndown()
 	const rule = '-'.repeat(64)
 	title = oneLine(title)
@@ -156,5 +200,5 @@ export function formatAsTxt(conversations, title) {
 		return `${acc}${rule}\n${header}\n${rule}\n\n${attachments}${_itemContent(ts, c)}\n\n`
 	}, '')
 
-	return `${title}\n${'='.repeat(Math.min(64, title.length))}\n\n${_preamble('txt')}\n\n${body}`
+	return `${title}\n${'='.repeat(Math.min(64, title.length))}\n\n${_preamble('txt')}\n\n${_noticeBlock(info, 'txt')}${body}`
 }
