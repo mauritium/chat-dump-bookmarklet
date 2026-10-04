@@ -41,7 +41,9 @@ UI strings and export labels are localized in the 10 most spoken languages — E
 
 Copy the contents of [`dist/chatdump.bookmarklet.js`](./dist/chatdump.bookmarklet.js) into the URL field of a new browser bookmark. Alternatively, visit the [ChatDump web page](https://www.mauriziofonte.it/blog/post/chatdump-bookmarklet.html) and drag the bookmarklet link to your bookmarks toolbar.
 
-Then open a conversation on a supported platform and click the bookmark. The toast appears immediately in a loading state while the conversation is fetched (a 10-second deadline guards against slow APIs; on timeout or any API error the DOM fallback takes over transparently), then shows the export buttons.
+Then open a conversation on a supported platform and click the bookmark. The toast appears immediately in a loading state while the conversation is fetched (requests are cancelled after 15 s each / 90 s overall; on timeout or any API error the DOM fallback takes over), then shows the export buttons.
+
+The bookmarklet only runs on `https://` pages of exactly `chatgpt.com`, `www.chatgpt.com`, `chat.openai.com`, `claude.ai`, `www.claude.ai` and `gemini.google.com`.
 
 > **Heads up!** As with any bookmarklet, review the source before installing it. `npm run build` reproduces `dist/` byte-for-byte from `src/`.
 
@@ -62,7 +64,7 @@ Everything runs offline against fixtures — no live account needed.
 
 **DOM fixtures.** Open a conversation, save the full page as HTML in the project root named `<platform>-<n>.html` (e.g. `claude-1.html`). These files are gitignored.
 
-**Regression tests** (`npm test`, Node's built-in runner plus `jsdom`; no live account needed) cover the HTML-export escaping (`test/html-security.test.mjs`).
+**Regression tests** (`npm test`, Node's built-in runner plus `jsdom`; no live account needed) cover the HTML-export escaping, hardening (hosts, redirects, timeouts, Blob URLs; `test/html-security.test.mjs`, `test/hardening.test.mjs`).
 
 **Test harness** (`jsdom`-based, plain Node scripts):
 
@@ -94,10 +96,10 @@ When reverse-engineering a platform API, capture a HAR of the conversation page 
 ```text
 index.js                     entry point: calls run()
 src/ChatDump.js              orchestrator: platform detection, remote-first extraction
-                             with 10s deadline, DOM fallback, formatting, toast
-src/ParserFactory.js         hostname -> parser resolution
+                             with AbortController deadlines, DOM fallback, formatting, toast
+src/ParserFactory.js         exact HTTPS hostname -> parser resolution
 src/Parsers/*.js             per-platform ParserModule: parseRemote() (API) + parse() (DOM)
-src/RemoteUtils.js           shared helpers for API extractors (apiGet, marker, fence)
+src/RemoteUtils.js           apiFetch/apiGet (same-origin, no redirects, abortable), marker, fence
 src/ConversationProcessor.js item validation, UI-chrome cleanup, heading demotion
 src/OutputFormatter.js       Markdown / HTML / TXT documents (scaffolding, preamble)
 src/MarkdownRenderer.js      compact MD->HTML renderer for API-sourced turns
