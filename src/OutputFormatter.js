@@ -35,7 +35,7 @@ function _preamble(format) {
 	}
 	if (format === 'html') {
 		// t() output is escaped around the placeholders: escape the localized text, then splice markup
-		return _htmlPreamble({ tool: htmlLink(REPO_URL, 'ChatDump'), date, url: href === 'unknown' ? escapeHtml(href) : htmlLink(href) })
+		return _htmlPreamble({ tool: htmlLink(REPO_URL, 'ChatDump'), date: escapeHtml(date), url: href === 'unknown' ? escapeHtml(href) : htmlLink(href) })
 	}
 	return t('preamble', { format: 'TXT', tool: `ChatDump (${REPO_URL})`, date, url: href })
 }
@@ -47,11 +47,8 @@ function _preamble(format) {
  * @returns {string} The preamble HTML.
  */
 function _htmlPreamble(parts) {
-	const tokens = { format: 'HTML', tool: '\u0001tool\u0001', date: '\u0001date\u0001', url: '\u0001url\u0001' }
-	return escapeHtml(t('preamble', tokens))
-		.replace('\u0001tool\u0001', () => parts.tool)
-		.replace('\u0001date\u0001', () => escapeHtml(parts.date))
-		.replace('\u0001url\u0001', () => parts.url)
+	const tokens = { format: 'HTML', tool: '\u0001tool', date: '\u0001date', url: '\u0001url' }
+	return escapeHtml(t('preamble', tokens)).replace(/\u0001(tool|date|url)/g, (m, key) => parts[key])
 }
 
 /**
