@@ -30,7 +30,7 @@ function _preamble(format) {
 	// The page URL is attacker-influenced (query, fragment): validate and normalize it
 	const href = safeHttpUrl(window.location.href) || 'unknown'
 	if (format === 'md') {
-		const md = href === 'unknown' ? href : `[${href.replace(/[[\]]/g, '\\$&')}](${href.replace(/[()]/g, encodeURIComponent)})`
+		const md = href === 'unknown' ? href : `[${href.replace(/[[\]]/g, '\\$&')}](${href.replace(/\(/g, '%28').replace(/\)/g, '%29')})`
 		return t('preamble', { format: 'Markdown', tool: `[ChatDump](${REPO_URL})`, date, url: md })
 	}
 	if (format === 'html') {
