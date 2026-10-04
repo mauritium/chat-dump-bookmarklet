@@ -88,7 +88,7 @@ Everything runs offline against fixtures — no live account needed.
 
 **DOM fixtures.** Open a conversation, save the full page as HTML in the project root named `<platform>-<n>.html` (e.g. `claude-1.html`). These files are gitignored.
 
-**Regression tests** (`npm test`, Node's built-in runner plus `jsdom`; no live account needed) cover the HTML-export escaping, hardening (hosts, redirects, timeouts, Blob URLs) and ChatGPT retrieval (pagination, duplicates, cursors, branches, completeness notice) citations and metadata (`test/*.test.mjs`). `test/fixtures/chatgpt-paged-synthetic.json` is a synthetic paginated ChatGPT payload (invented content, `example.*` domains) mirroring the record shapes of real payloads.
+**Regression tests** (`npm test`, Node's built-in runner plus `jsdom`; no live account needed): HTML injection, hardening (hosts, redirects, timeouts, Blob URLs), ChatGPT pagination / duplicates / cursors / branches / completeness, citations, metadata, a Claude fixture, and the committed `dist/` bookmarklet executed in jsdom and rebuilt from source. Fixtures live in `test/fixtures/`: `chatgpt-paged-synthetic.json` is a synthetic paginated ChatGPT payload (invented content, `example.*` domains) that mirrors the record shapes, `genui` citations and metadata of real payloads, and `claude-conversation.json` is a synthetic Claude payload.
 
 **Test harness** (`jsdom`-based, plain Node scripts):
 
@@ -139,6 +139,27 @@ types.js                     JSDoc typedefs (ConversationItem, ParserModule)
 ```
 
 An export also carries an `ExportInfo` (source, completeness, warnings) that the formatters render as the notice. A turn travels the pipeline as a `ConversationItem`, carrying either a **detached DOM node** (`content`, from DOM parsing) or a **Markdown string** (`markdown`, from API extraction), plus optional `attachments`. Formatters handle both transparently.
+
+## Limitations and manual browser checks
+
+Remaining limitations:
+
+- Claude exports include extracted attachment text and artifact sources, and may therefore contain much more sensitive material than the visible chat.
+- HTML output is a fragment; escaping is the security control, and no Content-Security-Policy wrapper is added. Markdown rendering of raw HTML and links depends on the receiving application.
+- The bookmarklet is close to the 62KB URL budget; further features need space reclaimed elsewhere (for example locales).
+- Safari was verified by reproducing the original failure (raw spaces dropped from a pasted `javascript:` URL) with JavaScriptCore and by testing the fixed build; see the manual checks below for the other browsers.
+
+Manual checks to run in a signed-in browser before relying on an export (the automated tests use mocked APIs only):
+
+1. ChatGPT, a conversation longer than 100 turns: the export notice reports several pages and "start of the conversation was reached"; first and last turn match the page; in DevTools → Network the requests go to `/backend-api/conversations/{id}?...&before=...` and nothing leaves `chatgpt.com`.
+2. ChatGPT, a conversation with web citations: links appear instead of `genui` text; an old conversation with `【n†source】` citations.
+3. ChatGPT, an edited prompt or regenerated answer: only the active version appears and no "alternate versions" warning is raised unexpectedly (or it is raised and the text is plausible).
+4. Block the API (DevTools → Network → block `/backend-api/`) and run again: the DOM fallback appears with the amber toast and the "INCOMPLETE EXPORT RISK" notice.
+5. Claude, a conversation with an artifact, an attachment and edits: content, `Model`, `Created` and `Completed` look right; compare the visible branch with the export.
+6. Open the saved `.html` with a title and attachment name containing `<`/`"` characters: they show as text.
+7. Click the bookmark on a look-alike host or an `http://` page: the "Unsupported chat engine" toast appears and the Network tab shows no request.
+8. After dismissing the toast or running it twice, `chrome://blob-internals` (Chromium) shows the earlier Blob URLs released after ~30 s.
+9. Safari (macOS and iOS): paste the file into a new bookmark's URL field, open a conversation and click it; the toast must appear without a console error. Repeat in Firefox and a Chromium browser.
 
 ## Adding a new platform
 

@@ -107,3 +107,19 @@ export async function exportAll(setup, url = `https://chatgpt.com/c/${CONV_ID}`)
 	return { md, html, txt, toast: document.querySelector('.chatdump-toast').textContent }
 }
 
+
+export const CLAUDE_ID = '11111111-2222-3333-4444-555555555555'
+export const CLAUDE_ORG = 'aaaaaaaa-bbbb-cccc-dddd-eeeeeeeeeeee'
+
+/** Loads the representative Claude conversation payload (deep copy per call). */
+export function loadClaudeFixture() {
+	return JSON.parse(readFileSync(new URL('./fixtures/claude-conversation.json', import.meta.url), 'utf8'))
+}
+
+/** Routes serving a Claude conversation payload. */
+export function claudeRoutes(conversation) {
+	return {
+		'/api/organizations': [{ uuid: CLAUDE_ORG }],
+		[`/api/organizations/${CLAUDE_ORG}/chat_conversations/${CLAUDE_ID}?tree=True&rendering_mode=messages&render_all_tools=true`]: conversation,
+	}
+}
