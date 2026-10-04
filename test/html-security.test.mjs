@@ -70,3 +70,9 @@ test('rendered markdown links never carry javascript: URLs', async () => {
 	const dom = execute(html)
 	assert.equal(dom.window.document.querySelector('a').getAttribute('onmouseover'), null)
 })
+
+test('markdown preamble link keeps parentheses and brackets from breaking the link', () => {
+	installDom('https://chatgpt.com/c/11111111-2222-3333-4444-555555555555?q=(a)[b]')
+	const md = formatAsMarkdown([item()], 'T')
+	assert.match(md, /\[https:\/\/chatgpt\.com\/c\/[^\]]*\\\[b\\\]\]\(https:\/\/chatgpt\.com\/c\/[^)]*%28a%29/)
+})

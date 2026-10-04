@@ -32,6 +32,7 @@ const MESSAGES = {
 		notice_api_warn: 'POSSIBLY INCOMPLETE: retrieved from the conversation API ({pages} page(s), {messages} message(s)), but problems were found:',
 		notice_label: 'Export notice',
 		toast_incomplete: 'Possibly incomplete export; see the notice in the file.',
+		citation_unresolved: 'Citation unresolved',
 	},
 	zh: {
 		save_txt: '保存为 TXT',
