@@ -26,6 +26,9 @@ export function createConversationItem(itemData) {
 	if (hasMarkdown) {
 		item.markdown = itemData.markdown
 	}
+	if (itemData.meta && typeof itemData.meta === 'object') {
+		item.meta = itemData.meta
+	}
 	if (itemData.richText) {
 		item.richText = true
 	}

@@ -1,23 +1,6 @@
-import { test, mock } from 'node:test'
+import { test } from 'node:test'
 import assert from 'node:assert/strict'
-import { installDom, mockFetch, loadPagedFixture, splitPages, pagedRoutes, CONV_ID } from './helpers.mjs'
-
-/** Runs the whole bookmarklet pipeline and returns the three exports and the toast. */
-async function exportAll(setup) {
-	const dom = installDom(`https://chatgpt.com/c/${CONV_ID}`)
-	global.requestAnimationFrame = (cb) => cb()
-	Object.defineProperty(dom.window.HTMLElement.prototype, 'innerText', { get() { return this.textContent }, configurable: true })
-	const blobs = []
-	global.URL.createObjectURL = (b) => (blobs.push(b), `blob:${blobs.length}`)
-	global.URL.revokeObjectURL = () => {}
-	mock.method(console, 'warn', () => {})
-	mock.method(console, 'error', () => {})
-	setup(dom)
-	const { run } = await import('../src/ChatDump.js?' + Math.random())
-	await run()
-	const [md, html, txt] = await Promise.all(blobs.slice(-3).map((b) => b.text()))
-	return { md, html, txt, toast: document.querySelector('.chatdump-toast').textContent }
-}
+import { mockFetch, loadPagedFixture, splitPages, pagedRoutes, exportAll } from './helpers.mjs'
 
 const domTurns = (dom) => {
 	dom.window.document.body.innerHTML =

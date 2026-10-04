@@ -30,6 +30,7 @@ export async function run() {
 		let rawConversations = null
 		/** @type {ExportInfo} */
 		let info = { source: 'dom', complete: false, warnings: [] }
+		const exportedAt = new Date().toISOString()
 		if (parser.parseRemote) {
 			// Immediate feedback: the API roundtrip can take seconds on long
 			// conversations. The loading toast is replaced by the export
@@ -42,7 +43,14 @@ export async function run() {
 				if (remote && remote.items.length) {
 					rawConversations = remote.items
 					title = remote.title || title
-					info = { source: 'api', complete: remote.complete === true, warnings: remote.warnings || [], stats: remote.stats }
+					info = {
+						source: 'api',
+						complete: remote.complete === true,
+						warnings: remote.warnings || [],
+						stats: remote.stats,
+						models: remote.models,
+						defaultModel: remote.defaultModel,
+					}
 				} else {
 					info.reason = 'no usable data'
 					console.warn('[ChatDump] API unavailable, using DOM')
@@ -61,6 +69,8 @@ export async function run() {
 		if (rawConversations.length === 0) {
 			throw new Error(t('no_conversations'))
 		}
+
+		info.exportedAt = exportedAt
 
 		// 4. Process and clean the extracted conversations
 		const processedConversations = processConversations(rawConversations)

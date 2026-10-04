@@ -43,10 +43,11 @@ Every format shares the same scaffolding:
 
 - **H1** — the conversation title.
 - **Provenance line** — localized, right under the title: tool link, creation date in your browser locale, and the URL of the original conversation.
+- **Header details** – `Models:` (the model identifiers recorded on the exported responses, verbatim; internal identifiers are not translated into public names), `Conversation default model:` when it differs, and `Exported:` (ISO 8601 UTC).
 - **Escaping** – titles, attachment names, headers and link targets inserted into the HTML export are HTML-escaped; links are limited to `http(s)` URLs, and Markdown/TXT titles and attachment names are kept on one line.
 - **Export notice** – see above.
 - **Citations** – ChatGPT `genui` markers are replaced by `([site](url), …)` through `metadata.content_references` (all sources and supporting websites; `utm_source=chatgpt.com` removed). Older `cite`/`entity` markers and `【n†source】` brackets are handled too. Unresolvable markers stay visible as `[Citation unresolved: <ids>]`; no URL is ever constructed. Code blocks, inline code and your own prompts are left literal.
-- **H2** — one per turn: `Human Prompt {n}` / `LLM Response {n}` (localized).
+- **H2** – one per turn: `Human Prompt {n}` / `LLM Response {n}` (localized), followed by a metadata line: `Created` (original message time, ISO 8601 UTC) for prompts; `Created`, `Model`, `Completed` and `Last updated` for responses. Claude's `Completed` comes from content-block stop timestamps; ChatGPT records no completion time, so it reads `unknown` and the record's last modification is shown separately. Missing values read `unknown`.
 - **Turn content** — headings authored by the LLM are demoted to start at H3 (relative hierarchy preserved, fenced code untouched), so they never collide with the turn scaffolding.
 - **Markers** — one-liners for non-text events: `> [Attachments: ...]`, `> [Artifact: title]` (followed by its source when available), `> [Tool: ...]`.
 
@@ -54,7 +55,7 @@ The TXT export carries the same content with plain-text separators instead of Ma
 
 ## Localization
 
-UI strings and export labels are localized in the 10 most spoken languages — English, Mandarin Chinese, Hindi, Spanish, French, Arabic, Bengali, Portuguese, Russian, Urdu — plus Italian, selected automatically from `navigator.language` (English fallback, RTL layout for Arabic and Urdu). The export-notice and unresolved-citation strings are English only and fall back to English in every locale.
+UI strings and export labels are localized in the 10 most spoken languages — English, Mandarin Chinese, Hindi, Spanish, French, Arabic, Bengali, Portuguese, Russian, Urdu — plus Italian, selected automatically from `navigator.language` (English fallback, RTL layout for Arabic and Urdu). The export-notice, metadata-label and unresolved-citation strings are English only and fall back to English in every locale.
 
 ## Installation
 
@@ -87,7 +88,7 @@ Everything runs offline against fixtures — no live account needed.
 
 **DOM fixtures.** Open a conversation, save the full page as HTML in the project root named `<platform>-<n>.html` (e.g. `claude-1.html`). These files are gitignored.
 
-**Regression tests** (`npm test`, Node's built-in runner plus `jsdom`; no live account needed) cover the HTML-export escaping, hardening (hosts, redirects, timeouts, Blob URLs) and ChatGPT retrieval (pagination, duplicates, cursors, branches, completeness notice) and citations (`test/*.test.mjs`). `test/fixtures/chatgpt-paged-synthetic.json` is a synthetic paginated ChatGPT payload (invented content, `example.*` domains) mirroring the record shapes of real payloads.
+**Regression tests** (`npm test`, Node's built-in runner plus `jsdom`; no live account needed) cover the HTML-export escaping, hardening (hosts, redirects, timeouts, Blob URLs) and ChatGPT retrieval (pagination, duplicates, cursors, branches, completeness notice) citations and metadata (`test/*.test.mjs`). `test/fixtures/chatgpt-paged-synthetic.json` is a synthetic paginated ChatGPT payload (invented content, `example.*` domains) mirroring the record shapes of real payloads.
 
 **Test harness** (`jsdom`-based, plain Node scripts):
 
@@ -124,6 +125,7 @@ src/ParserFactory.js         exact HTTPS hostname -> parser resolution
 src/Parsers/*.js             per-platform ParserModule: parseRemote() (API) + parse() (DOM)
 src/ChatGPTApi.js            paginated retrieval, dedupe, active-branch resolution, warnings
 src/RemoteUtils.js           apiFetch/apiGet (same-origin, no redirects, abortable), marker, fence
+src/Metadata.js              ISO timestamps, model ids, header and per-turn metadata blocks
 src/Citations.js             genui / cite / 【†】 markers -> Markdown links
 src/ConversationProcessor.js item validation, UI-chrome cleanup, heading demotion
 src/OutputFormatter.js       Markdown / HTML / TXT documents (scaffolding, preamble)

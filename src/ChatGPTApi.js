@@ -239,7 +239,7 @@ export function resolveMessages(pages, warnings) {
  * @param {string} id - The conversation UUID.
  * @param {Object<string, string>} headers - Request headers (authorization).
  * @param {AbortSignal} [signal] - Cancels in-flight requests.
- * @returns {Promise<{endpoint: 'paged'|'legacy', title: string|undefined, messages: object[], warnings: string[], complete: boolean, stats: object}>}
+ * @returns {Promise<{endpoint: 'paged'|'legacy', title: string|undefined, defaultModel: string|undefined, messages: object[], warnings: string[], complete: boolean, stats: object}>}
  */
 export async function fetchConversation(id, headers, signal) {
 	let fetched
@@ -256,6 +256,7 @@ export async function fetchConversation(id, headers, signal) {
 	return {
 		endpoint: fetched.legacy ? 'legacy' : 'paged',
 		title: fetched.pages[0].title,
+		defaultModel: fetched.pages[0].default_model_slug,
 		messages: resolved.messages,
 		warnings,
 		complete,
