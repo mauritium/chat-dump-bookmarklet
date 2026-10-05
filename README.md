@@ -47,11 +47,11 @@ The TXT export carries the same content with plain-text separators instead of Ma
 
 ## Localization
 
-UI strings and export labels are localized in the 10 most spoken languages — English, Mandarin Chinese, Hindi, Spanish, French, Arabic, Bengali, Portuguese, Russian, Urdu — plus Italian, selected automatically from `navigator.language` (English fallback, RTL layout for Arabic and Urdu). The strings added by this fork (export notice, metadata labels, unresolved-citation note) are English only and fall back to English in every locale.
+UI strings and export labels exist in the 10 most spoken languages — English, Mandarin Chinese (`zh`), Hindi (`hi`), Spanish (`es`), French (`fr`), Arabic (`ar`), Bengali (`bn`), Portuguese (`pt`), Russian (`ru`), Urdu (`ur`) — plus Italian (`it`), with RTL layout for Arabic and Urdu. Each bookmarklet contains English plus at most one other language, because all eleven tables together do not fit the URL size limit. The committed `dist/chatdump.bookmarklet.js` is English only; `npm run release` builds one file per language into `release/` (`chatdump.<lang>.bookmarklet.js`, English plus that language, selected by `navigator.language`, English otherwise), which are published as release assets and not committed. The strings added by this fork (export notice, metadata labels, unresolved-citation note) are English only and fall back to English in every language.
 
 ## Installation
 
-Copy the contents of [`dist/chatdump.bookmarklet.js`](./dist/chatdump.bookmarklet.js) into the URL field of a new browser bookmark. Alternatively, visit the [ChatDump web page](https://www.mauriziofonte.it/blog/post/chatdump-bookmarklet.html) and drag the bookmarklet link to your bookmarks toolbar.
+Copy the contents of [`dist/chatdump.bookmarklet.js`](./dist/chatdump.bookmarklet.js) (English) into the URL field of a new browser bookmark. For another language, download `chatdump.<lang>.bookmarklet.js` from the release assets instead (see [Localization](#localization)). Alternatively, visit the [ChatDump web page](https://www.mauriziofonte.it/blog/post/chatdump-bookmarklet.html) and drag the bookmarklet link to your bookmarks toolbar.
 
 Then open a conversation on a supported platform and click the bookmark. The toast appears immediately in a loading state while the conversation is fetched (requests are cancelled after 15 s each / 90 s overall; on timeout or any API error the DOM fallback takes over and the export says so), then shows the export buttons.
 
@@ -69,11 +69,12 @@ cd chat-dump-bookmarklet
 npm ci          # installs exactly package-lock.json (lifecycle scripts are disabled by .npmrc)
 npm run build   # writes dist/chatdump.bookmarklet.js and prints its SHA-256
 npm run verify  # rebuilds in memory and fails if dist/ differs
+npm run release # one bookmarklet per language in release/ (not committed)
 npm test
 npm audit       # 0 vulnerabilities at the time of writing
 ```
 
-The build bundles and minifies with `esbuild` (evergreen-browser targets: the chat platforms themselves require nothing less), prefixes `javascript:void`, encodes (see `encode.js`), and writes `dist/chatdump.bookmarklet.js`. It **fails hard** if the encoded output exceeds the 62KB bookmarklet URL limit; current size is ~63.4KB of 63.5KB, so almost no room is left (most of it is the i18n tables). To save space, the build stores spaces in the message tables as `~` and `t()` restores them (a space costs 3 bytes once encoded, `~` one). All dependency versions are pinned exactly; only `turndown` and `turndown-plugin-gfm` ship in the bundle, `esbuild` and `jsdom` are development-only.
+The build bundles and minifies with `esbuild` (evergreen-browser targets: the chat platforms themselves require nothing less), prefixes `javascript:void`, encodes (see `encode.js`), and writes `dist/chatdump.bookmarklet.js`. It **fails hard** if the encoded output exceeds the 62KB bookmarklet URL limit; current size is ~51.3KB for the English build and 52–53KB for the other languages (`npm run release`), most of it Turndown and the message tables. To save space, the build keeps only English plus the requested language, and stores spaces in the message tables as `~` and `t()` restores them (a space costs 3 bytes once encoded, `~` one). All dependency versions are pinned exactly; only `turndown` and `turndown-plugin-gfm` ship in the bundle, `esbuild` and `jsdom` are development-only.
 
 ## Development and testing
 
@@ -121,7 +122,7 @@ src/ChatGPTApi.js            paginated retrieval, dedupe, active-branch resoluti
 src/Citations.js             genui / cite / 【†】 markers -> Markdown links
 src/Metadata.js              ISO timestamps, model ids, header and per-turn metadata blocks
 src/Html.js                  escapeHtml, safeHttpUrl, htmlLink, oneLine
-bundle.js, build.js, encode.js  reproducible build, --check mode, bookmarklet encoding
+bundle.js, build.js, encode.js  reproducible build, --check mode, per-language --release builds, bookmarklet encoding
 src/ConversationProcessor.js item validation, UI-chrome cleanup, heading demotion
 src/OutputFormatter.js       Markdown / HTML / TXT documents (scaffolding, preamble)
 src/MarkdownRenderer.js      compact MD->HTML renderer for API-sourced turns
@@ -201,7 +202,7 @@ Known limitations of this fork:
 - Claude and Gemini retrieval is unchanged: no pagination, completeness check or independent active-branch traversal (edited or regenerated Claude branches were not verified against live payloads), no citation conversion. Claude exports include extracted attachment text and artifact sources and may therefore contain much more sensitive material than the visible chat.
 - New notice, metadata and citation labels are English only.
 - HTML output is a fragment; escaping is the security control, no Content-Security-Policy wrapper is added. Markdown rendering of raw HTML and links depends on the receiving application.
-- The bookmarklet is 63,359 bytes of the 63,488-byte (62KB) budget; further features need space reclaimed elsewhere (for example locales or Gemini). Safari 17 and later were not available for testing here; the Safari fix was verified by reproducing the reported error with JavaScriptCore (see the changelog) and by asserting that the file contains no raw whitespace.
+- Each bookmarklet is 51–53KB of the 63,488-byte (62KB) budget, so only English plus one other language fits. The Safari space fix was found by reproducing the reported error with JavaScriptCore (see the changelog), is covered by a test that asserts the file contains no raw whitespace, and was confirmed in Safari 17 by hand.
 
 Manual checks to run in a signed-in browser before relying on an export (the automated tests use mocked APIs only):
 
@@ -216,6 +217,10 @@ Manual checks to run in a signed-in browser before relying on an export (the aut
 9. Safari (macOS and iOS): paste the file into a new bookmark's URL field, open a conversation and click it; the toast must appear without a console error. Repeat in Firefox and a Chromium browser.
 
 ## Changelog
+
+### Unreleased (fork)
+
+- **Per-language builds:** the committed bookmarklet is English only; `npm run release` builds `release/chatdump.<lang>.bookmarklet.js` (English plus one language) for all eleven languages. This frees about 12KB of the URL budget.
 
 ### v1.5.0 (fork, 2026-10-04)
 

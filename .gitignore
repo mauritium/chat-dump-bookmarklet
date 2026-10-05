@@ -6,3 +6,4 @@ OUTPUT.md
 claude-*.md
 chatgpt-*.md
 gemini-*.md
+release/

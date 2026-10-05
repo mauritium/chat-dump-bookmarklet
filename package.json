@@ -6,7 +6,8 @@
     "build": "node build.js",
     "verify": "node build.js --check",
     "test": "node --test test/*.test.mjs",
-    "audit": "npm audit"
+    "audit": "npm audit",
+    "release": "node build.js --release"
   },
   "type": "module",
   "homepage": "https://www.mauriziofonte.it/blog/post/chatdump-bookmarklet.html",
