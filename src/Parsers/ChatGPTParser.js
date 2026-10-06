@@ -3,7 +3,7 @@ import { createConversationItem } from '../ConversationProcessor.js'
 import { t } from '../I18n.js'
 import { apiGet, marker, fence } from '../RemoteUtils.js'
 import { fetchConversation } from '../ChatGPTApi.js'
-import { convertCitations } from '../Citations.js'
+import { convertMarkers } from '../Markers.js'
 import { toIso, latestIso, modelId, unique } from '../Metadata.js'
 
 const CONVERSATION_PATH = /\/c\/([0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12})/i
@@ -121,7 +121,7 @@ const ChatGPTParser = {
 					items.push(createConversationItem({ role: 'PROMPT', num: ++promptNum, markdown, attachments, meta }))
 				}
 			} else if (role === 'assistant') {
-				const markdown = convertCitations(_messageMarkdown(message), message.metadata)
+				const markdown = convertMarkers(_messageMarkdown(message), message.metadata)
 				if (markdown) {
 					responseParts.push(markdown)
 					responseMessages.push(message)
