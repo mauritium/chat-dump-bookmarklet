@@ -27,8 +27,9 @@ test('synthetic paginated JSON: single page, exact endpoint, complete', async ()
 		['PROMPT', 'RESPONSE', 'PROMPT', 'RESPONSE'],
 	)
 	assert.match(texts(r, 'PROMPT')[0], /^Which gasket size fits/)
-	// short preambles are accepted and merged into the response; reasoning stays excluded
-	assert.match(texts(r, 'RESPONSE')[0], /^I’ll look up the gasket sizes/)
+	// the commentary preamble is a working note, not part of the answer
+	assert.match(texts(r, 'RESPONSE')[0], /^\*\*Typically/)
+	assert.doesNotMatch(texts(r, 'RESPONSE')[0], /look up the gasket sizes/)
 	assert.match(texts(r, 'RESPONSE')[0], /Typically, “G1,”/)
 	assert.doesNotMatch(JSON.stringify(r.items), /Worked for|thoughts|reasoning_recap/)
 })

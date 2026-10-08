@@ -18,7 +18,7 @@ ChatDump therefore extracts the conversation from each platform's own **same-ori
 | **ChatGPT** | `/backend-api/conversations/{uuid}?include_has_versions=true&num_turns=100`, following `page_info.start_cursor` backwards (`&before=<cursor>`); legacy `/backend-api/conversation/{uuid}` as fallback (bearer token from `/api/auth/session`) | Every page, deduplicated and in order; the active branch (checked against `current_node`); assistant tool/code chains merged into one response; attachments; citations as links; models and timestamps |
 | **Gemini** | `batchexecute` RPC `hNvQHb` (auth token from `WIZ_global_data`) | All turns via cursor pagination, the regenerated draft actually continued (parent-pointer match), attachment file names |
 
-Model *thinking* / hidden system messages are excluded on all platforms by design: the export is the conversation, not the model's chrome. This fork leaves that filtering unchanged; short assistant preambles such as "I'll check…" that ChatGPT records as visible messages are exported with the response.
+Model *thinking* / hidden system messages are excluded on all platforms by design: the export is the conversation, not the model's chrome. For ChatGPT the rule is: export what the chat window shows by default, nothing else, whether or not the UI lets you expand it. An assistant message is exported only when it is addressed to the user (`recipient` is `all` or absent), is not on the `commentary` channel (interim narration and thinking preambles) or the `analysis` channel, is not marked `reasoning_status: is_reasoning` or hidden, and is not a `code` message (tool input). Tool calls such as code interpreter or web search requests and tool results are therefore left out, and consecutive remaining answer messages are merged into one response.
 
 ### Completeness is explicit
 
@@ -199,7 +199,7 @@ Known limitations of this fork:
 - The ChatGPT endpoint, its `before=<start_cursor>` parameter and the payload shapes are undocumented and were taken from the community write-up ([discussion 204601](https://github.com/orgs/community/discussions/204601#discussioncomment-18431658)) and the synthetic fixture; they can change at any time. The pagination parameter name has not been confirmed against a live account.
 - In the paginated message-list format, `metadata.parent_id` often points at structural nodes that are not messages (seen in real payloads), so a parent that is not among the messages is not treated as an error. Cycles and sibling versions sharing a parent are reported; how `include_has_versions` marks alternate versions is not modeled, so a version selection that the server resolved silently cannot be verified.
 - ChatGPT records no response completion time; `Completed: unknown` is expected there.
-- Reasoning/preamble filtering is unchanged from 1.4.0 (thinking and hidden messages excluded, short visible preambles kept). Records on an `analysis` channel or with an internal recipient are not filtered.
+- The ChatGPT visibility rule is derived from the fields seen in real payloads (`recipient`, `channel`, `reasoning_status`, `content_type`). A future payload change could hide an answer (for example a new channel name) or show working notes; the rule is in `_isShownByDefault` in `src/Parsers/ChatGPTParser.js`.
 - Claude and Gemini retrieval is unchanged: no pagination, completeness check or independent active-branch traversal (edited or regenerated Claude branches were not verified against live payloads), no citation conversion. Claude exports include extracted attachment text and artifact sources and may therefore contain much more sensitive material than the visible chat.
 - New notice, metadata and citation labels are English only.
 - HTML output is a fragment; escaping is the security control, no Content-Security-Policy wrapper is added. Markdown rendering of raw HTML and links depends on the receiving application.
@@ -221,6 +221,8 @@ Manual checks to run in a signed-in browser before relying on an export (the aut
 
 ### Unreleased (fork)
 
+- **ChatGPT visibility:** only messages the chat window shows by default are exported. Tool calls (`recipient` other than `all`), `commentary` and `analysis` channel messages (including thinking preambles), messages flagged `reasoning_status: is_reasoning`, and `code` messages (tool input) no longer reach the transcript. Previously only hidden messages and non-text content were skipped.
+- **Audit:** `source-map-js` 1.2.2 (GHSA-68fv-2mgg-jv7q, development dependency via jsdom).
 - **Inline markers:** `product`, `products`, `image_group`, `url`, `navlist`, `video`, `entity` and `genui` widgets are rendered as readable Markdown (module renamed `Citations.js` to `Markers.js`); unknown markers fall back to the platform's `alt` text or `[name: arguments]`, and no private-use delimiter survives in the export. The English bookmarklet grows by about 2KB.
 - **Per-language builds:** the committed bookmarklet is English only; `npm run release` builds `release/chatdump.<lang>.bookmarklet.js` (English plus one language) for all eleven languages. This frees about 12KB of the URL budget.
 
