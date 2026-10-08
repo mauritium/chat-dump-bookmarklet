@@ -2,7 +2,7 @@
  * Verifies the ChatGPT remote (API-based) extraction path with a mocked
  * same-origin fetch: session token retrieval, active-branch linearization
  * from the conversation tree (branched mapping), merging of consecutive
- * assistant nodes, code fencing, attachments, hidden-message exclusion.
+ * assistant nodes, exclusion of tool input (code messages), attachments, hidden-message exclusion.
  */
 import { JSDOM } from 'jsdom'
 
@@ -84,7 +84,8 @@ check('4 items (2 prompts + 2 merged responses)', remote && remote.items.length 
 check('title from API', remote.title === 'GPT test conversation')
 
 const md = formatAsMarkdown(processConversations(remote.items), remote.title)
-check('assistant nodes merged into one response', md.includes('Answer part one.') && md.includes('```python\nprint(42)\n```'))
+check('assistant answer kept', md.includes('Answer part one.'))
+check('tool input (code message) excluded', !md.includes('print(42)'))
 check('abandoned branch excluded', !md.includes('OLD ANSWER'))
 check('hidden system message excluded', !md.includes('system noise'))
 check('attachment listed', md.includes('data.csv'))

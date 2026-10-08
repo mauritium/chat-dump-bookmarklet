@@ -1,7 +1,7 @@
 import '../../types.js'
 import { createConversationItem } from '../ConversationProcessor.js'
 import { t } from '../I18n.js'
-import { apiGet, marker, fence } from '../RemoteUtils.js'
+import { apiGet, marker } from '../RemoteUtils.js'
 import { fetchConversation } from '../ChatGPTApi.js'
 import { convertMarkers } from '../Markers.js'
 import { toIso, latestIso, modelId, unique } from '../Metadata.js'
@@ -32,12 +32,30 @@ function _messageMarkdown(message) {
 			.filter(Boolean)
 			.join('\n\n')
 	}
-	if (content.content_type === 'code' && typeof content.text === 'string' && content.text.trim()) {
-		const lang = content.language && content.language !== 'unknown' ? content.language : ''
-		return fence(content.text, lang)
-	}
-	// thoughts, reasoning_recap, user_editable_context, execution outputs: skipped
+	// thoughts, reasoning_recap, user_editable_context, code (tool input), execution outputs: skipped
 	return ''
+}
+
+/**
+ * True for an assistant message that the chat window shows by default, that
+ * is, the answer itself. Everything else belongs to the working phase, whether
+ * or not the UI lets you expand it: tool calls (a recipient other than the
+ * user, such as a code interpreter or web search), the interim narration and
+ * preambles of the commentary channel, the analysis channel, messages flagged
+ * as reasoning, and hidden messages. Code-type messages are tool input.
+ * @param {object} message - A mapping-node message.
+ * @returns {boolean}
+ */
+function _isShownByDefault(message) {
+	const metadata = message.metadata || {}
+	return (
+		(!message.recipient || message.recipient === 'all') &&
+		message.channel !== 'commentary' &&
+		message.channel !== 'analysis' &&
+		metadata.reasoning_status !== 'is_reasoning' &&
+		!metadata.is_visually_hidden_from_conversation &&
+		(message.content || {}).content_type !== 'code'
+	)
 }
 
 /**
@@ -120,7 +138,7 @@ const ChatGPTParser = {
 					const meta = { created: toIso(message.create_time), completed: null, updated: null, models: [] }
 					items.push(createConversationItem({ role: 'PROMPT', num: ++promptNum, markdown, attachments, meta }))
 				}
-			} else if (role === 'assistant') {
+			} else if (role === 'assistant' && _isShownByDefault(message)) {
 				const markdown = convertMarkers(_messageMarkdown(message), message.metadata)
 				if (markdown) {
 					responseParts.push(markdown)

@@ -38,12 +38,12 @@ test('synthetic fixture: header model, ISO creation times, export time, completi
 	assert.match(out.md, /\n- Models: test-model-alpha\n- Exported: 2026-10-04T12:00:00\.000Z\n/)
 	// prompt: creation only; response: model, completion unknown, last update separate
 	assert.match(out.md, /## Human Prompt 1\n\n> Created: 2023-11-14T22:13:20\.125Z\n\nWhich gasket size fits/)
-	assert.match(out.md, /## LLM Response 1\n\n> Created: 2023-11-14T22:13:22\.250Z · Model: test-model-alpha · Completed: unknown · Last updated: 2023-11-14T22:13:35\.750Z\n\n/)
-	assert.match(out.md, /## LLM Response 2\n\n> Created: 2023-11-14T22:15:02\.750Z · Model: test-model-alpha · Completed: unknown · Last updated: 2023-11-15T09:20:00\.250Z\n/)
+	assert.match(out.md, /## LLM Response 1\n\n> Created: 2023-11-14T22:13:28\.500Z · Model: test-model-alpha · Completed: unknown · Last updated: 2023-11-14T22:13:35\.750Z\n\n/)
+	assert.match(out.md, /## LLM Response 2\n\n> Created: 2023-11-14T22:15:10\.000Z · Model: test-model-alpha · Completed: unknown · Last updated: 2023-11-15T09:20:00\.250Z\n/)
 	assert.match(out.html, /<li>Models: test-model-alpha<\/li><li>Exported: 2026-10-04T12:00:00\.000Z<\/li>/)
 	assert.match(out.html, /<h2>Human Prompt 1<\/h2>\n<p><em>Created: 2023-11-14T22:13:20\.125Z<\/em><\/p>/)
 	assert.match(out.txt, /Models: test-model-alpha\nExported: 2026-10-04T12:00:00\.000Z\n/)
-	assert.match(out.txt, /Created: 2023-11-14T22:13:22\.250Z · Model: test-model-alpha · Completed: unknown/)
+	assert.match(out.txt, /Created: 2023-11-14T22:13:28\.500Z · Model: test-model-alpha · Completed: unknown/)
 })
 
 test('models that vary between responses are kept per response and listed in the header', async () => {
