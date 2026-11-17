@@ -1,4 +1,4 @@
-/** Runs the original script-style checks (remote-*.js, ui-smoke) as part of npm test. */
+/** Runs the original script-style API checks (remote-*.js) as part of npm test. */
 import { test } from 'node:test'
 import assert from 'node:assert/strict'
 import { execFileSync } from 'node:child_process'

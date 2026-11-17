@@ -69,7 +69,7 @@ const html = formatAsHtml(items, remote.title)
 
 check('response headings demoted below turn level', md.includes('### Analysis section') && !md.includes('\n## Analysis section'))
 check('fenced attachment headings untouched', md.includes('# PRD') && !md.includes('### PRD'))
-check('provenance preamble present', md.includes('[ChatDump](https://github.com/mauriziofonte/chat-dump-bookmarklet)') && md.includes(CONV_ID))
+check('provenance preamble present', md.includes('[ChatDump](https://github.com/mauritium/chat-dump-bookmarklet)') && md.includes(CONV_ID))
 
 check('markdown has all 4 turns', md.includes('Human Prompt 1') && md.includes('LLM Response 2'))
 check('attachment names listed', md.includes('PRD_v1.md') && md.includes('screenshot-1.png'))

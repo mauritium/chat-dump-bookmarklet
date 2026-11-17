@@ -1,12 +1,12 @@
 /**
  * ChatDump
  *
- * @version 1.5.0
+ * @version 1.4.0+mauritium.1
  * @author Maurizio Fonte <fonte.maurizio@gmail.com>
- * @website https://github.com/mauriziofonte/chat-dump-bookmarklet
+ * @website https://github.com/mauritium/chat-dump-bookmarklet (fork of https://github.com/mauriziofonte/chat-dump-bookmarklet)
  * @license MIT licensed
- * @description A browser bookmarklet to export chat conversations from various AI chat
- *              platforms (like ChatGPT, Gemini, Claude) into Markdown and HTML formats.
+ * @description A browser bookmarklet to export chat conversations from ChatGPT, Claude,
+ *              and Gemini to Markdown, HTML, and plain text.
  */
 import { run } from './src/ChatDump.js'
 

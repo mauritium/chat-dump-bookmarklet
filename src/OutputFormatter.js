@@ -7,7 +7,7 @@ import { turnMetaBlock, headerBlock } from './Metadata.js'
 import TurndownService from 'turndown'
 import { tables } from 'turndown-plugin-gfm'
 
-const REPO_URL = 'https://github.com/mauriziofonte/chat-dump-bookmarklet'
+const REPO_URL = 'https://github.com/mauritium/chat-dump-bookmarklet'
 
 /**
  * Generates a header for a conversation turn, in the browser language.

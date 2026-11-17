@@ -237,12 +237,14 @@ Manual checks to run in a signed-in browser before relying on an export (the aut
 
 ## Changelog
 
-The dated entries describe changes made in the fork [mauritium/chat-dump-bookmarklet](https://github.com/mauritium/chat-dump-bookmarklet) after v1.4.0. They have no version numbers, which remain for the upstream project to assign.
+The dated entries describe changes made in the fork [mauritium/chat-dump-bookmarklet](https://github.com/mauritium/chat-dump-bookmarklet) after v1.4.0. They have no version numbers, which remain for the upstream project to assign; the package version `1.4.0+mauritium.1` marks the fork with semver build metadata on the upstream base.
 
 ### 2026-11-17
 
 - **Timeout:** the per-request API timeout is now 30 s instead of 15 s. A very long ChatGPT conversation can take more than 15 s to arrive, and the DOM fallback that replaced it lost most of the conversation. The 90 s overall deadline is unchanged.
 - **Audit:** `npm audit fix` updated `undici` to 7.30.2 (development dependency via jsdom).
+- **Attribution:** the ChatDump link in the provenance line of every export points to the fork repository instead of upstream, because the exports now differ substantially from those of 1.4.0.
+- **Version:** the package version is `1.4.0+mauritium.1` (was `1.5.0`).
 
 ### 2026-10-08
 

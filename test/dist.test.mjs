@@ -20,7 +20,7 @@ test('dist reproduces byte for byte from the pinned source', async () => {
 
 test('dist is self-contained: no external hosts, script loading or telemetry primitives', () => {
 	// The only URL literal is the project link shown in the export preamble
-	assert.deepEqual([...new Set(source.match(/https?:\/\/[a-z0-9.\/_-]+/gi))], ['https://github.com/mauriziofonte/chat-dump-bookmarklet'])
+	assert.deepEqual([...new Set(source.match(/https?:\/\/[a-z0-9.\/_-]+/gi))], ['https://github.com/mauritium/chat-dump-bookmarklet'])
 	assert.doesNotMatch(source, /sendBeacon|XMLHttpRequest|WebSocket|importScripts|eval\(|new Function|createElement\(["']script/)
 	assert.equal((source.match(/\bfetch\(/g) || []).length, 1, 'a single fetch call site (apiFetch)')
 })
