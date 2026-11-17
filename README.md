@@ -26,7 +26,7 @@ Every export carries an **Export notice** (Markdown, HTML and TXT) and the toast
 
 - **DOM fallback** is always labelled as possibly incomplete, with the reason the API retrieval failed. It is never presented as a verified export.
 - **ChatGPT API retrieval** states how many pages and messages were read and that the start of the conversation was reached, or lists what went wrong: no `page_info`, a repeated or missing cursor, the 1000-page / 200000-message safety limits, duplicate ids with differing content, `current_node` missing or not last (trailing messages from another branch are left out and counted), sibling versions sharing a parent, cycles, or a missing parent in a tree payload. An unresolvable `current_node` in a tree payload aborts the API path (DOM fallback, labelled) instead of guessing a branch.
-- Requests are bounded: 15 s per request and 90 s overall, both cancelled with `AbortController`.
+- Requests are bounded: 30 s per request and 90 s overall, both cancelled with `AbortController`.
 
 The **DOM fallback** still works on every platform (and is what the offline test harness exercises): it clones `document.body`, extracts turns with platform-specific selectors, strips UI chrome (buttons, screen-reader labels, copy-code decorations), and preserves attachments and artifact/tool chips as inline markers.
 
@@ -53,7 +53,7 @@ UI strings and export labels exist in the 10 most spoken languages — English, 
 
 Copy the contents of [`dist/chatdump.bookmarklet.js`](./dist/chatdump.bookmarklet.js) (English) into the URL field of a new browser bookmark. For another language, download `chatdump.<lang>.bookmarklet.js` from the release assets instead (see [Localization](#localization)). Alternatively, visit the [ChatDump web page](https://www.mauriziofonte.it/blog/post/chatdump-bookmarklet.html) and drag the bookmarklet link to your bookmarks toolbar.
 
-Then open a conversation on a supported platform and click the bookmark. The toast appears immediately in a loading state while the conversation is fetched (requests are cancelled after 15 s each / 90 s overall; on timeout or any API error the DOM fallback takes over and the export says so), then shows the export buttons.
+Then open a conversation on a supported platform and click the bookmark. The toast appears immediately in a loading state while the conversation is fetched (requests are cancelled after 30 s each / 90 s overall; on timeout or any API error the DOM fallback takes over and the export says so), then shows the export buttons.
 
 The bookmarklet only runs on `https://` pages of exactly `chatgpt.com`, `www.chatgpt.com`, `chat.openai.com`, `claude.ai`, `www.claude.ai` and `gemini.google.com`.
 
