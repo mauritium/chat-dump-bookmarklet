@@ -3,7 +3,7 @@
  */
 
 /** Per-request deadline; the request is cancelled (not just ignored) when it passes. */
-export const REQUEST_TIMEOUT_MS = 15000
+export const REQUEST_TIMEOUT_MS = 30000
 
 /**
  * Fetches a same-origin API path with explicit safety checks: the path must be

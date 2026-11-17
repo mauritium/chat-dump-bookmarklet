@@ -41,7 +41,7 @@ UI strings and export labels are localized in the 10 most spoken languages — E
 
 Copy the contents of [`dist/chatdump.bookmarklet.js`](./dist/chatdump.bookmarklet.js) into the URL field of a new browser bookmark. Alternatively, visit the [ChatDump web page](https://www.mauriziofonte.it/blog/post/chatdump-bookmarklet.html) and drag the bookmarklet link to your bookmarks toolbar.
 
-Then open a conversation on a supported platform and click the bookmark. The toast appears immediately in a loading state while the conversation is fetched (requests are cancelled after 15 s each / 90 s overall; on timeout or any API error the DOM fallback takes over), then shows the export buttons.
+Then open a conversation on a supported platform and click the bookmark. The toast appears immediately in a loading state while the conversation is fetched (requests are cancelled after 30 s each / 90 s overall; on timeout or any API error the DOM fallback takes over), then shows the export buttons.
 
 The bookmarklet only runs on `https://` pages of exactly `chatgpt.com`, `www.chatgpt.com`, `chat.openai.com`, `claude.ai`, `www.claude.ai` and `gemini.google.com`.
 
