@@ -1,6 +1,6 @@
-# ChatDump (security-hardened fork)
+# ChatDump
 
-> Fork of [ChatDump](https://github.com/mauriziofonte/chat-dump-bookmarklet) 1.4.0 (audit baseline commit `a5d80c653690a42eba6c1b69bb93a6e53d3910ba`) for private ChatGPT and Claude exports. It fixes the audited HTML-export injection, hardens browser operation, retrieves ChatGPT conversations completely and says so when it cannot, converts citations to Markdown links, and records models and timestamps. The bookmarklet stays self-contained and local: no telemetry, no external script loading, no uploads. See [Limitations](#limitations-and-manual-browser-checks).
+> [mauritium/chat-dump-bookmarklet](https://github.com/mauritium/chat-dump-bookmarklet) is a fork of [ChatDump](https://github.com/mauriziofonte/chat-dump-bookmarklet) 1.4.0 (commit `a5d80c653690a42eba6c1b69bb93a6e53d3910ba`). It fixes bugs, among them a security vulnerability and bugs that could silently drop parts of a conversation from an export. It also adapts ChatDump to changes in the chat platforms' web interfaces and adds features that its maintainer found useful. The [changelog](#changelog) lists the changes, and [Limitations and manual browser checks](#limitations-and-manual-browser-checks) lists what has not been verified.
 
 A browser bookmarklet that exports your **ChatGPT**, **Gemini**, and **Claude** conversations to **Markdown**, **HTML**, and **plain text** — complete, faithful, and in your language.
 
@@ -15,18 +15,19 @@ ChatDump therefore extracts the conversation from each platform's own **same-ori
 | Platform | Primary extraction | What you get |
 | --- | --- | --- |
 | **Claude** | `/api/organizations/{org}/chat_conversations/{uuid}` (org UUID from the `lastActiveOrg` cookie, `/api/organizations` fallback) | Every turn, prompt attachments **with their extracted text content**, artifact sources as fenced code blocks, tool-use markers |
-| **ChatGPT** | `/backend-api/conversations/{uuid}?include_has_versions=true&num_turns=100`, following `page_info.start_cursor` backwards (`&before=<cursor>`); legacy `/backend-api/conversation/{uuid}` as fallback (bearer token from `/api/auth/session`) | Every page, deduplicated and in order; the active branch (checked against `current_node`); assistant tool/code chains merged into one response; attachments; citations as links; models and timestamps |
+| **ChatGPT** | `/backend-api/conversations/{uuid}`, page by page, with `/backend-api/conversation/{uuid}` as fallback (bearer token from `/api/auth/session`) | Every turn of the active branch with a completeness check, only what the chat window shows, attachments, citations as links, models and timestamps |
 | **Gemini** | `batchexecute` RPC `hNvQHb` (auth token from `WIZ_global_data`) | All turns via cursor pagination, the regenerated draft actually continued (parent-pointer match), attachment file names |
 
-Model *thinking* / hidden system messages are excluded on all platforms by design: the export is the conversation, not the model's chrome. For ChatGPT the rule is: export what the chat window shows by default, nothing else, whether or not the UI lets you expand it. An assistant message is exported only when it is addressed to the user (`recipient` is `all` or absent), is not on the `commentary` channel (interim narration and thinking preambles) or the `analysis` channel, is not marked `reasoning_status: is_reasoning` or hidden, and is not a `code` message (tool input). Tool calls such as code interpreter or web search requests and tool results are therefore left out, and consecutive remaining answer messages are merged into one response.
+Model *thinking* / hidden system messages are excluded on all platforms by design: the export is the conversation, not the model's chrome. A ChatGPT export contains only what the chat window shows without expanding anything. Thinking, interim progress notes, tool calls (e.g., code interpreter or web search requests), and their results are left out, and an answer that ChatGPT delivers in several parts appears as one response.
 
-### Completeness is explicit
+### Export notice
 
-Every export carries an **Export notice** (Markdown, HTML and TXT) and the toast turns amber when it applies:
+Exports from the ChatGPT API and from the DOM fallback contain an **Export notice** in all three formats. When the export is not verified complete, the toast also turns amber and says so. Claude and Gemini API exports have no notice.
 
-- **DOM fallback** is always labelled as possibly incomplete, with the reason the API retrieval failed. It is never presented as a verified export.
-- **ChatGPT API retrieval** states how many pages and messages were read and that the start of the conversation was reached, or lists what went wrong: no `page_info`, a repeated or missing cursor, the 1000-page / 200000-message safety limits, duplicate ids with differing content, `current_node` missing or not last (trailing messages from another branch are left out and counted), sibling versions sharing a parent, cycles, or a missing parent in a tree payload. An unresolvable `current_node` in a tree payload aborts the API path (DOM fallback, labelled) instead of guessing a branch.
-- Requests are bounded: 30 s per request and 90 s overall, both cancelled with `AbortController`.
+- **DOM fallback:** the notice always reads "INCOMPLETE EXPORT RISK" and gives the reason the API retrieval failed.
+- **ChatGPT API:** the notice states how many pages and messages were read and that the start of the conversation was reached. If retrieval found problems, such as missing pages, a safety limit on pages or messages, or an unclear active branch, the notice reads "POSSIBLY INCOMPLETE" and lists them. If the active branch cannot be determined at all, ChatDump uses the DOM fallback instead of guessing.
+
+Each request is canceled after 30 s and the whole retrieval after 90 s; either timeout leads to the DOM fallback.
 
 The **DOM fallback** still works on every platform (and is what the offline test harness exercises): it clones `document.body`, extracts turns with platform-specific selectors, strips UI chrome (buttons, screen-reader labels, copy-code decorations), and preserves attachments and artifact/tool chips as inline markers.
 
@@ -36,35 +37,51 @@ Every format shares the same scaffolding:
 
 - **H1** — the conversation title.
 - **Provenance line** — localized, right under the title: tool link, creation date in your browser locale, and the URL of the original conversation.
-- **Header details** – `Models:` (the model identifiers recorded on the exported responses, verbatim; internal identifiers are not translated into public names), `Conversation default model:` when it differs, and `Exported:` (ISO 8601 UTC).
-- **Export notice** – see above.
-- **H2** – one per turn: `Human Prompt {n}` / `LLM Response {n}` (localized), followed by a metadata line: `Created` (original message time, ISO 8601 UTC) for prompts; `Created`, `Model`, `Completed` and `Last updated` for responses. Claude's `Completed` comes from content-block stop timestamps; ChatGPT records no completion time, so it reads `unknown` and the record's last modification is shown separately. Missing values read `unknown`.
-- **Inline markers** – ChatGPT's UI markers (U+E200 name U+E202 arguments U+E201) are turned into readable Markdown, resolved through the message's `metadata.content_references`: `cite` and `genui` citations become `([site](url), …)` with all sources and supporting websites (`utm_source=chatgpt.com` removed); `url` becomes a link; `product` and `products` become lines with name, price, rating and merchants (a link only when the data has a URL); `image_group` lists the source pages of the images (the signed image URLs are not exported); `entity` becomes its name; `navlist` and `video` list their links; `genui` math widgets become display equations. Older `cite`/`entity` markers and `【n†source】` brackets are handled too. A marker without an interpreter is rendered from the platform's own plain-text fallback (the reference's `alt`, cleaned), else as `[name: arguments]`, and stray delimiters are removed, so no invisible characters are left. Unresolved citations stay visible as `[Citation unresolved: <ids>]`; no URL is ever constructed. Code blocks, inline code and your own prompts are left literal.
+- **Header details** — `Models:` lists the models that wrote the responses, as identifiers recorded by the platform, which can differ from the model names shown in the app. `Conversation default model:` follows when it is not among them, and `Exported:` gives the export time (ISO 8601 UTC).
+- **Export notice** — see [Export notice](#export-notice).
+- **H2** — one per turn: `Human Prompt {n}` / `LLM Response {n}` (localized).
+- **Turn metadata** — in ChatGPT and Claude API exports, a line under each H2: `Created` (original message time, ISO 8601 UTC) for prompts; `Created`, `Model`, `Completed`, and `Last updated` for responses. Missing values read `unknown`. For Claude, `Completed` is when the response finished. ChatGPT records no completion time, so `Completed` reads `unknown` there and `Last updated` shows when the record was last modified.
 - **Turn content** — headings authored by the LLM are demoted to start at H3 (relative hierarchy preserved, fenced code untouched), so they never collide with the turn scaffolding.
 - **Markers** — one-liners for non-text events: `> [Attachments: ...]`, `> [Artifact: title]` (followed by its source when available), `> [Tool: ...]`.
 
 The TXT export carries the same content with plain-text separators instead of Markdown headers.
 
+### ChatGPT citations and inline elements
+
+ChatGPT answers contain elements that the app displays specially. ChatDump converts them to readable Markdown:
+
+- Citations become links to all cited sources, e.g., `([example.com](https://example.com/…))`. ChatGPT's tracking parameter `utm_source=chatgpt.com` is removed. Citations in the older format of earlier conversations are converted too.
+- Links stay links.
+- Product cards become lines with name, price, rating, and merchants.
+- Image galleries become links to the pages the images come from; the images themselves are not exported.
+- News lists and videos become lists of links.
+- Math widgets become display equations.
+- Highlighted names become plain text.
+
+An element that ChatDump does not know is exported as the plain text ChatGPT provides for it, or as `[name: arguments]` if there is none. A citation whose source cannot be found is marked `[Citation unresolved: <ids>]`; ChatDump never makes up a URL. Code and your own prompts are left as they are.
+
 ## Localization
 
-UI strings and export labels exist in the 10 most spoken languages — English, Mandarin Chinese (`zh`), Hindi (`hi`), Spanish (`es`), French (`fr`), Arabic (`ar`), Bengali (`bn`), Portuguese (`pt`), Russian (`ru`), Urdu (`ur`) — plus Italian (`it`), with RTL layout for Arabic and Urdu. Each bookmarklet contains English plus at most one other language, because all eleven tables together do not fit the URL size limit. The committed `dist/chatdump.bookmarklet.js` is English only; `npm run release` builds one file per language into `release/` (`chatdump.<lang>.bookmarklet.js`, English plus that language, selected by `navigator.language`, English otherwise), which are published as release assets and not committed. The strings added by this fork (export notice, metadata labels, unresolved-citation note) are English only and fall back to English in every language.
+UI strings and export labels are localized in the 10 most spoken languages — English, Mandarin Chinese (`zh`), Hindi (`hi`), Spanish (`es`), French (`fr`), Arabic (`ar`), Bengali (`bn`), Portuguese (`pt`), Russian (`ru`), Urdu (`ur`) — plus Italian (`it`), with RTL layout for Arabic and Urdu.
+
+All eleven tables together do not fit the bookmarklet size limit, so each bookmarklet contains English plus at most one other language. The committed `dist/chatdump.bookmarklet.js` is English only. `npm run release` writes one bookmarklet per language to `release/chatdump.<lang>.bookmarklet.js` (not committed); each contains English and that language and chooses between them by the browser language. Strings added since 1.4.0 (export notice, toast warning, metadata labels, and unresolved-citation note) exist only in English and appear in English in every language.
 
 ## Installation
 
-Copy the contents of [`dist/chatdump.bookmarklet.js`](./dist/chatdump.bookmarklet.js) (English) into the URL field of a new browser bookmark. For another language, download `chatdump.<lang>.bookmarklet.js` from the release assets instead (see [Localization](#localization)). Alternatively, visit the [ChatDump web page](https://www.mauriziofonte.it/blog/post/chatdump-bookmarklet.html) and drag the bookmarklet link to your bookmarks toolbar.
+Copy the contents of [`dist/chatdump.bookmarklet.js`](./dist/chatdump.bookmarklet.js) (English) into the URL field of a new browser bookmark. For another language, build `release/chatdump.<lang>.bookmarklet.js` with `npm run release` (see [Building from source](#building-from-source)) and use that file instead. Alternatively, visit the [ChatDump web page](https://www.mauriziofonte.it/blog/post/chatdump-bookmarklet.html) and drag the bookmarklet link to your bookmarks toolbar. That page serves the upstream bookmarklet, which lacks the changes listed in the dated [changelog](#changelog) entries.
 
-Then open a conversation on a supported platform and click the bookmark. The toast appears immediately in a loading state while the conversation is fetched (requests are cancelled after 30 s each / 90 s overall; on timeout or any API error the DOM fallback takes over and the export says so), then shows the export buttons.
+Then open a conversation on a supported platform and click the bookmark. The toast appears immediately in a loading state while the conversation is fetched (each request is canceled after 30 s and the whole retrieval after 90 s; on timeout or any API error the DOM fallback takes over and the export says so), then shows the export buttons.
 
-The bookmarklet only runs on `https://` pages of exactly `chatgpt.com`, `www.chatgpt.com`, `chat.openai.com`, `claude.ai`, `www.claude.ai` and `gemini.google.com`.
+The bookmarklet runs only on `https://` pages of exactly `chatgpt.com`, `www.chatgpt.com`, `chat.openai.com`, `claude.ai`, `www.claude.ai`, and `gemini.google.com`.
 
 > **Heads up!** As with any bookmarklet, review the source before installing it. `npm run verify` rebuilds from the pinned source and lockfile and fails unless `dist/` matches byte for byte.
 
-> **Embedding the bookmarklet in HTML.** Spaces, `%`, `#`, `<`, `>` and control characters are percent-encoded; quotes, backslashes, braces and brackets stay raw (escaping them as `encodeURI` does would add ~14KB). Spaces must be encoded because Safari silently drops raw spaces from a pasted `javascript:` URL, which breaks the code with `SyntaxError: Unexpected token '{'`. Pasting into the bookmark URL field works as is; to embed the file in an `href`, escape `"` as `&quot;` first.
+> **Embedding the bookmarklet in HTML.** Spaces, `%`, `#`, `<`, `>`, and control characters are percent-encoded. Quotes, backslashes, braces, and brackets stay raw, because escaping them as `encodeURI` does would add about 14KB. Spaces must be encoded because Safari silently drops raw spaces from a pasted `javascript:` URL, which breaks the code with `SyntaxError: Unexpected token '{'`. The file can be pasted into the bookmark URL field as is; to embed it in an `href`, first escape `"` as `&quot;`.
 
 ## Building from source
 
 ```bash
-git clone <this fork>
+git clone https://github.com/mauritium/chat-dump-bookmarklet.git
 cd chat-dump-bookmarklet
 npm ci          # installs exactly package-lock.json (lifecycle scripts are disabled by .npmrc)
 npm run build   # writes dist/chatdump.bookmarklet.js and prints its SHA-256
@@ -74,7 +91,7 @@ npm test
 npm audit       # 0 vulnerabilities at the time of writing
 ```
 
-The build bundles and minifies with `esbuild` (evergreen-browser targets: the chat platforms themselves require nothing less), prefixes `javascript:void`, encodes (see `encode.js`), and writes `dist/chatdump.bookmarklet.js`. It **fails hard** if the encoded output exceeds the 62KB bookmarklet URL limit; current size is ~51.3KB for the English build and 52–53KB for the other languages (`npm run release`), most of it Turndown and the message tables. To save space, the build keeps only English plus the requested language, and stores spaces in the message tables as `~` and `t()` restores them (a space costs 3 bytes once encoded, `~` one). All dependency versions are pinned exactly; only `turndown` and `turndown-plugin-gfm` ship in the bundle, `esbuild` and `jsdom` are development-only.
+The build bundles and minifies with `esbuild` (evergreen-browser targets: the chat platforms themselves require nothing less), prefixes `javascript:void`, encodes (see `encode.js`), and writes `dist/chatdump.bookmarklet.js`. It **fails hard** if the encoded output exceeds the 62KB bookmarklet URL limit; current size is about 52KB for the English build and 53–54KB with a second language (`npm run release`), most of it Turndown and the message tables. To save space, the build keeps only English plus the requested language and stores the spaces in the message tables as `~`, which `t()` turns back into spaces (an encoded space takes 3 bytes, a `~` one). All dependency versions are pinned exactly. Only `turndown` and `turndown-plugin-gfm` are bundled; `esbuild` and `jsdom` are development dependencies.
 
 ## Development and testing
 
@@ -82,9 +99,9 @@ Everything runs offline against fixtures — no live account needed.
 
 **DOM fixtures.** Open a conversation, save the full page as HTML in the project root named `<platform>-<n>.html` (e.g. `claude-1.html`). These files are gitignored.
 
-**Regression tests** (`npm test`, Node's built-in runner plus `jsdom`; no live account needed): HTML injection, hardening (hosts, redirects, timeouts, Blob URLs), ChatGPT pagination / duplicates / cursors / branches / completeness, markers, metadata, a Claude fixture, and the committed `dist/` bookmarklet executed in jsdom and rebuilt from source. Fixtures live in `test/fixtures/`: `chatgpt-paged-synthetic.json` is a synthetic paginated ChatGPT payload (invented content, `example.*` domains) that mirrors the record shapes, `genui` citations and metadata of real payloads, and `claude-conversation.json` is a synthetic Claude payload.
+**Regression tests** (`npm test`, Node's built-in test runner with `jsdom`) cover HTML injection; hardening (hosts, redirects, timeouts, Blob URLs); ChatGPT pagination, duplicates, cursors, branches, completeness, and visibility; markers; metadata; a Claude fixture; the encoding and the per-language builds; and the committed `dist/` bookmarklet, which is executed in jsdom and compared with a fresh build. The fixtures in `test/fixtures/` are synthetic. `chatgpt-paged-synthetic.json` is a paginated ChatGPT payload with invented content and `example.*` domains that mirrors the record shapes, `genui` citations, and metadata of real payloads; `claude-conversation.json` is a Claude payload.
 
-**Test harness** (older `jsdom`-based Node scripts, the `remote-*` ones also run under `npm test`):
+**Test harness** (`jsdom`-based, plain Node scripts; `npm test` also runs the three `remote-*` scripts):
 
 ```bash
 node test/verify.js         # real parsers against every HTML dump, prints extracted items
@@ -114,7 +131,7 @@ When reverse-engineering a platform API, capture a HAR of the conversation page 
 ```text
 index.js                     entry point: calls run()
 src/ChatDump.js              orchestrator: platform detection, remote-first extraction
-                             with AbortController deadline, labelled DOM fallback, formatting, toast
+                             with AbortController deadline, labeled DOM fallback, formatting, toast
 src/ParserFactory.js         hostname -> parser resolution
 src/Parsers/*.js             per-platform ParserModule: parseRemote() (API) + parse() (DOM)
 src/RemoteUtils.js           apiFetch/apiGet (same-origin, no redirects, abortable), marker, fence
@@ -122,7 +139,6 @@ src/ChatGPTApi.js            paginated retrieval, dedupe, active-branch resoluti
 src/Markers.js               ChatGPT UI markers (cite, genui, url, product(s), image_group, ...) -> Markdown
 src/Metadata.js              ISO timestamps, model ids, header and per-turn metadata blocks
 src/Html.js                  escapeHtml, safeHttpUrl, htmlLink, oneLine
-bundle.js, build.js, encode.js  reproducible build, --check mode, per-language --release builds, bookmarklet encoding
 src/ConversationProcessor.js item validation, UI-chrome cleanup, heading demotion
 src/OutputFormatter.js       Markdown / HTML / TXT documents (scaffolding, preamble)
 src/MarkdownRenderer.js      compact MD->HTML renderer for API-sourced turns
@@ -131,9 +147,12 @@ src/I18n.js                  locale tables (10 languages + Italian) and t()
 src/UIManager.js             toast UI (loading / export / copied / error states)
 src/Utilities.js             filename slug/timestamp
 types.js                     JSDoc typedefs (ConversationItem, ParserModule)
+bundle.js                    esbuild bundle, keeping English plus the requested languages
+build.js                     writes dist/ (--release: release/, --check: compares with dist/)
+encode.js                    javascript: URL encoding
 ```
 
-An export also carries an `ExportInfo` (source, completeness, warnings, models, export time) that the formatters render as the notice and header. A turn travels the pipeline as a `ConversationItem`, carrying either a **detached DOM node** (`content`, from DOM parsing) or a **Markdown string** (`markdown`, from API extraction), plus optional `attachments`. Formatters handle both transparently.
+A turn travels the pipeline as a `ConversationItem`, carrying either a **detached DOM node** (`content`, from DOM parsing) or a **Markdown string** (`markdown`, from API extraction), plus optional `attachments`. Formatters handle both transparently. Turns from the ChatGPT and Claude APIs also have `meta` (timestamps and models). The export as a whole has an `ExportInfo` (source, completeness, warnings, models, export time), which the formatters render as the header details and the export notice.
 
 ## Adding a new platform
 
@@ -193,22 +212,21 @@ Contributions are welcome: fork, branch, add the feature or fix (with its test),
 
 ## Limitations and manual browser checks
 
-Known limitations of this fork:
+Known limitations:
 
-- The `product`, `products`, `image_group`, `url` and `cite` interpreters were written against observed payloads. `navlist`, `video`, `entity` and the `genui` widgets other than math follow the syntax described in a community-collected copy of ChatGPT's system prompt and have not been checked against real payloads; they degrade to the `alt` text or `[name: arguments]` when the data differs.
-- The ChatGPT endpoint, its `before=<start_cursor>` parameter and the payload shapes are undocumented and were taken from the community write-up ([discussion 204601](https://github.com/orgs/community/discussions/204601#discussioncomment-18431658)) and the synthetic fixture; they can change at any time. The pagination parameter name has not been confirmed against a live account.
-- In the paginated message-list format, `metadata.parent_id` often points at structural nodes that are not messages (seen in real payloads), so a parent that is not among the messages is not treated as an error. Cycles and sibling versions sharing a parent are reported; how `include_has_versions` marks alternate versions is not modeled, so a version selection that the server resolved silently cannot be verified.
-- ChatGPT records no response completion time; `Completed: unknown` is expected there.
-- The ChatGPT visibility rule is derived from the fields seen in real payloads (`recipient`, `channel`, `reasoning_status`, `content_type`). A future payload change could hide an answer (for example a new channel name) or show working notes; the rule is in `_isShownByDefault` in `src/Parsers/ChatGPTParser.js`.
-- Claude and Gemini retrieval is unchanged: no pagination, completeness check or independent active-branch traversal (edited or regenerated Claude branches were not verified against live payloads), no citation conversion. Claude exports include extracted attachment text and artifact sources and may therefore contain much more sensitive material than the visible chat.
-- New notice, metadata and citation labels are English only.
-- HTML output is a fragment; escaping is the security control, no Content-Security-Policy wrapper is added. Markdown rendering of raw HTML and links depends on the receiving application.
-- Each bookmarklet is 51–53KB of the 63,488-byte (62KB) budget, so only English plus one other language fits. The Safari space fix was found by reproducing the reported error with JavaScriptCore (see the changelog), is covered by a test that asserts the file contains no raw whitespace, and was confirmed in Safari 17 by hand.
+- The conversion of ChatGPT citations, links, product cards, and image galleries was written against real conversations. The conversion of news lists, videos, highlighted names, and widgets other than math follows a community-collected copy of ChatGPT's system prompt and has not been checked against real conversations; if the data differs, these elements appear as ChatGPT's plain text or `[name: arguments]`.
+- ChatGPT's paginated conversation API is undocumented and can change at any time. ChatDump's use of it is based on a community write-up ([discussion 204601](https://github.com/orgs/community/discussions/204601#discussioncomment-18431658)) and a synthetic test fixture, and the way it requests older pages has not been confirmed against a live account.
+- For edited prompts and regenerated answers in ChatGPT, ChatDump reports the alternate versions it detects, but it cannot verify a choice of version that the server made without marking it.
+- The rule that decides which ChatGPT messages the chat window shows is derived from real conversations. A future change by ChatGPT could hide an answer or show working notes; the rule is `_isShownByDefault` in `src/Parsers/ChatGPTParser.js`.
+- Claude and Gemini retrieval is unchanged since 1.4.0: it has no pagination, completeness check, independent check of the active branch, or citation conversion, and edited or regenerated Claude conversations were not verified against real ones. Claude exports include extracted attachment text and artifact sources and may therefore contain much more sensitive material than the visible chat.
+- Strings added since 1.4.0 are English only (see [Localization](#localization)).
+- HTML output is a fragment without a Content-Security-Policy wrapper, so escaping is its only security control. How raw HTML and links in Markdown output are rendered depends on the receiving application.
+- Each bookmarklet uses 52–54KB of the 63,488-byte (62KB) budget, so only English plus one other language fits. The space encoding required by Safari is based on reproducing the reported error in JavaScriptCore (see the 2026-10-04 changelog entry), is covered by a test that asserts the file contains no raw whitespace, and was confirmed by hand in Safari 17.
 
 Manual checks to run in a signed-in browser before relying on an export (the automated tests use mocked APIs only):
 
 1. ChatGPT, a conversation longer than 100 turns: the export notice reports several pages and "start of the conversation was reached"; first and last turn match the page; in DevTools → Network the requests go to `/backend-api/conversations/{id}?...&before=...` and nothing leaves `chatgpt.com`.
-2. ChatGPT, a conversation with web citations: links appear instead of `genui` text; an old conversation with `【n†source】` citations.
+2. ChatGPT, a conversation with web citations: links appear instead of citation markup. Repeat with an old conversation with citations.
 3. ChatGPT, an edited prompt or regenerated answer: only the active version appears and no "alternate versions" warning is raised unexpectedly (or it is raised and the text is plausible).
 4. Block the API (DevTools → Network → block `/backend-api/`) and run again: the DOM fallback appears with the amber toast and the "INCOMPLETE EXPORT RISK" notice.
 5. Claude, a conversation with an artifact, an attachment and edits: content, `Model`, `Created` and `Completed` look right; compare the visible branch with the export.
@@ -219,22 +237,35 @@ Manual checks to run in a signed-in browser before relying on an export (the aut
 
 ## Changelog
 
-### Unreleased (fork)
+The dated entries describe changes made in the fork [mauritium/chat-dump-bookmarklet](https://github.com/mauritium/chat-dump-bookmarklet) after v1.4.0. They have no version numbers, which remain for the upstream project to assign.
+
+### 2026-11-17
+
+- **Timeout:** the per-request API timeout is now 30 s instead of 15 s. A very long ChatGPT conversation can take more than 15 s to arrive, and the DOM fallback that replaced it lost most of the conversation. The 90 s overall deadline is unchanged.
+- **Audit:** `npm audit fix` updated `undici` to 7.30.2 (development dependency via jsdom).
+
+### 2026-10-08
 
 - **ChatGPT visibility:** only messages the chat window shows by default are exported. Tool calls (`recipient` other than `all`), `commentary` and `analysis` channel messages (including thinking preambles), messages flagged `reasoning_status: is_reasoning`, and `code` messages (tool input) no longer reach the transcript. Previously only hidden messages and non-text content were skipped.
-- **Audit:** `source-map-js` 1.2.2 (GHSA-68fv-2mgg-jv7q, development dependency via jsdom).
-- **Inline markers:** `product`, `products`, `image_group`, `url`, `navlist`, `video`, `entity` and `genui` widgets are rendered as readable Markdown (module renamed `Citations.js` to `Markers.js`); unknown markers fall back to the platform's `alt` text or `[name: arguments]`, and no private-use delimiter survives in the export. The English bookmarklet grows by about 2KB.
+
+### 2026-10-06
+
+- **Audit:** `source-map-js` updated to 1.2.2 (GHSA-68fv-2mgg-jv7q, development dependency via jsdom).
+
+### 2026-10-05
+
+- **Inline markers:** ChatGPT marks inline elements with private-use characters (U+E200 name U+E202 arguments U+E201), resolved through the message's `metadata.content_references`. Its `product`, `products`, `image_group`, `url`, `navlist`, `video`, `entity`, and `genui` widget markers are rendered as readable Markdown, and the module `Citations.js` is renamed `Markers.js`. Unknown markers fall back to ChatGPT's `alt` text or `[name: arguments]`, and no private-use delimiter remains in the export. The English bookmarklet grows by about 2KB.
 - **Per-language builds:** the committed bookmarklet is English only; `npm run release` builds `release/chatdump.<lang>.bookmarklet.js` (English plus one language) for all eleven languages. This frees about 12KB of the URL budget.
 
-### v1.5.0 (fork, 2026-10-04)
+### 2026-10-04
 
-- **Security:** conversation titles, attachment names, headers and the preamble links are escaped/validated in HTML; Markdown/TXT titles and names stay on one line (audit finding: medium). Template substitution in `t()` no longer interprets `$` sequences.
-- **Hardening:** HTTPS plus exact hostnames; all API calls through `apiFetch` (origin-relative paths, `redirect: 'error'`, final-origin check, `AbortController` per-request and overall deadlines); Blob URLs revoked 30 s after the toast is replaced or dismissed.
-- **ChatGPT retrieval:** paginated endpoint with cursor handling, dedupe, safety limits, branch and parent checks, legacy endpoint fallback; visible Export notice; DOM fallback labelled possibly incomplete.
-- **Citations:** `genui`, `cite`/`entity` and `【n†source】` markers converted to Markdown links; unresolved ones marked.
-- **Metadata:** models, ISO 8601 UTC creation/completion/update times, export time.
-- **Safari fix:** the bookmarklet URL left spaces raw, and Safari drops raw spaces from a pasted `javascript:` URL, so code such as `return {` broke with `SyntaxError: Unexpected token '{'`. Spaces are percent-encoded again. Removing the spaces from the decoded bundle reproduces exactly that error in JavaScriptCore (WebKitGTK `jsc`), and the bundle parses there once the spaces are kept. Size was recovered by storing spaces in the message tables as `~` and by shortening English warning strings.
-- **Packaging:** `npm audit fix` (esbuild 0.28.2, undici 7.30.0 in the dev graph), exact version pins, `.npmrc` with `ignore-scripts`, `npm run verify`, `node --test` regression suite, bookmarklet encoding that escapes only what must be escaped (spaces included, see the Safari note above), `~` for spaces in the message tables, and shorter English warning strings to stay under the 62KB limit.
+- **Security:** in the HTML export, conversation titles, attachment names, headers, and the preamble links are escaped or validated; in the Markdown and TXT exports, titles and names stay on one line (audit finding: medium). Template substitution in `t()` no longer interprets `$` sequences.
+- **Hardening:** the bookmarklet runs only on HTTPS pages of the exact supported hostnames. All API calls go through `apiFetch` (origin-relative paths, `redirect: 'error'`, final-origin check, `AbortController` per-request and overall deadlines). Blob URLs are revoked 30 s after the toast is replaced or dismissed.
+- **ChatGPT retrieval:** the paginated endpoint (`/backend-api/conversations/{uuid}?include_has_versions=true&num_turns=100`, following `page_info.start_cursor` backwards with `before`) is used with cursor handling, deduplication, safety limits, and branch and parent checks, with the legacy endpoint as fallback. The export notice reports the result, and the DOM fallback is labeled possibly incomplete.
+- **ChatGPT citations:** `genui`, `cite`, and `entity` markers and `【n†source】` brackets are converted to Markdown links, and unresolved citations are marked.
+- **Metadata:** ChatGPT and Claude exports record model identifiers and the creation, completion, and update times of each message (ISO 8601 UTC); every export records its export time.
+- **Bookmarklet encoding:** `encode.js` replaces `encodeURI` and percent-encodes only spaces, `%`, `#`, `<`, `>`, control characters, and non-ASCII characters. Spaces must be encoded because Safari drops raw spaces from a pasted `javascript:` URL, so code such as `return {` breaks with `SyntaxError: Unexpected token '{'`. Removing the spaces from the decoded bundle reproduces that error in JavaScriptCore (WebKitGTK `jsc`), and the bundle parses there once the spaces are kept. To stay under the 62KB limit, spaces in the message tables are stored as `~`, and some English warning strings are shorter.
+- **Packaging:** `npm audit fix` (esbuild 0.28.2, undici 7.30.0 in the development dependencies), exact version pins, `.npmrc` with `ignore-scripts`, `npm run verify`, and a `node --test` regression suite.
 
 ### v1.4.0 (2026-07-04)
 
